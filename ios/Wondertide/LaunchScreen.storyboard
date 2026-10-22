@@ -16,25 +16,39 @@
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Wondertide" textAlignment="center" lineBreakMode="middleTruncation" baselineAdjustment="alignBaselines" minimumFontSize="18" translatesAutoresizingMaskIntoConstraints="NO" id="GJd-Yh-RWb">
-                                <rect key="frame" x="0.0" y="202" width="375" height="43"/>
-                                <fontDescription key="fontDescription" type="boldSystem" pointSize="36"/>
-                                <nil key="highlightedColor"/>
-                            </label>
-                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Powered by React Native" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" minimumFontSize="9" translatesAutoresizingMaskIntoConstraints="NO" id="MN2-I3-ftu">
-                                <rect key="frame" x="0.0" y="626" width="375" height="21"/>
-                                <fontDescription key="fontDescription" type="system" pointSize="17"/>
-                                <nil key="highlightedColor"/>
-                            </label>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="SplashBackground" translatesAutoresizingMaskIntoConstraints="NO" id="WT-splash-background">
+                                <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
+                            </imageView>
+                            <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="WT-splash-veil">
+                                <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
+                                <color key="backgroundColor" red="0.02" green="0.13" blue="0.2" alpha="0.38" colorSpace="custom" customColorSpace="sRGB"/>
+                            </view>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="SplashMira" translatesAutoresizingMaskIntoConstraints="NO" id="WT-splash-mira">
+                                <rect key="frame" x="82.5" y="300" width="210" height="315"/>
+                            </imageView>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="SplashLogo" translatesAutoresizingMaskIntoConstraints="NO" id="GJd-Yh-RWb">
+                                <rect key="frame" x="58.5" y="84" width="258" height="150"/>
+                            </imageView>
                         </subviews>
-                        <color key="backgroundColor" systemColor="systemBackgroundColor" cocoaTouchSystemColor="whiteColor"/>
+                        <color key="backgroundColor" red="0.071" green="0.231" blue="0.333" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
-                            <constraint firstItem="Bcu-3y-fUS" firstAttribute="bottom" secondItem="MN2-I3-ftu" secondAttribute="bottom" constant="20" id="OZV-Vh-mqD"/>
+                            <constraint firstItem="WT-splash-background" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="WT-background-leading"/>
+                            <constraint firstItem="WT-splash-background" firstAttribute="trailing" secondItem="Ze5-6b-2t3" secondAttribute="trailing" id="WT-background-trailing"/>
+                            <constraint firstItem="WT-splash-background" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="WT-background-top"/>
+                            <constraint firstItem="WT-splash-background" firstAttribute="bottom" secondItem="Ze5-6b-2t3" secondAttribute="bottom" id="WT-background-bottom"/>
+                            <constraint firstItem="WT-splash-veil" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="WT-veil-leading"/>
+                            <constraint firstItem="WT-splash-veil" firstAttribute="trailing" secondItem="Ze5-6b-2t3" secondAttribute="trailing" id="WT-veil-trailing"/>
+                            <constraint firstItem="WT-splash-veil" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="WT-veil-top"/>
+                            <constraint firstItem="WT-splash-veil" firstAttribute="bottom" secondItem="Ze5-6b-2t3" secondAttribute="bottom" id="WT-veil-bottom"/>
+                            <constraint firstItem="WT-splash-mira" firstAttribute="centerX" secondItem="Bcu-3y-fUS" secondAttribute="centerX" id="WT-mira-center"/>
+                            <constraint firstItem="WT-splash-mira" firstAttribute="width" constant="205" id="WT-mira-width"/>
+                            <constraint firstItem="WT-splash-mira" firstAttribute="height" constant="268" id="WT-mira-height"/>
+                            <constraint firstItem="Bcu-3y-fUS" firstAttribute="bottom" secondItem="WT-splash-mira" secondAttribute="bottom" constant="112" id="WT-mira-bottom"/>
                             <constraint firstItem="Bcu-3y-fUS" firstAttribute="centerX" secondItem="GJd-Yh-RWb" secondAttribute="centerX" id="Q3B-4B-g5h"/>
-                            <constraint firstItem="MN2-I3-ftu" firstAttribute="centerX" secondItem="Bcu-3y-fUS" secondAttribute="centerX" id="akx-eg-2ui"/>
-                            <constraint firstItem="MN2-I3-ftu" firstAttribute="leading" secondItem="Bcu-3y-fUS" secondAttribute="leading" id="i1E-0Y-4RG"/>
-                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="bottom" multiplier="1/3" constant="1" id="moa-c2-u7t"/>
-                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="leading" secondItem="Bcu-3y-fUS" secondAttribute="leading" symbolic="YES" id="x7j-FC-K8j"/>
+                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="top" secondItem="Bcu-3y-fUS" secondAttribute="top" constant="64" id="moa-c2-u7t"/>
+                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="centerX" secondItem="Bcu-3y-fUS" secondAttribute="centerX" id="x7j-FC-K8j"/>
+                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="width" constant="258" id="WT-logo-width"/>
+                            <constraint firstItem="GJd-Yh-RWb" firstAttribute="height" constant="150" id="WT-logo-height"/>
                         </constraints>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
                     </view>
@@ -44,4 +58,9 @@
             <point key="canvasLocation" x="52.173913043478265" y="375"/>
         </scene>
     </scenes>
+    <resources>
+        <image name="SplashBackground" width="375" height="667"/>
+        <image name="SplashLogo" width="225" height="150"/>
+        <image name="SplashMira" width="210" height="315"/>
+    </resources>
 </document>

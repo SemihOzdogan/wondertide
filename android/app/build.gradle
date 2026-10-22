@@ -79,7 +79,7 @@ android {
 
     namespace "com.wondertide"
     defaultConfig {
-        applicationId "com.wondertide"
+        applicationId "com.wondertide.mergetales"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

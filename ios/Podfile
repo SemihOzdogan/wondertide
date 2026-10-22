@@ -5,7 +5,11 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
-platform :ios, min_ios_version_supported
+# Xcode's current simulator runtimes require iOS 15 or newer. React Native
+# 0.87.1's pods require iOS 15.1, so pin Pods as well as the app target to
+# prevent an older third-party pod from emitting an iOS 13
+# deployment target into Pods.xcodeproj.
+platform :ios, '15.1'
 prepare_react_native_project!
 
 linkage = ENV['USE_FRAMEWORKS']
@@ -15,6 +19,11 @@ if linkage != nil
 end
 
 target 'Wondertide' do
+  # Google Sign-In, App Check'in Swift podlarıyla statik bağlanırken bu iki
+  # Objective-C bağımlılığın modül haritasına ihtiyaç duyuyor.
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'RecaptchaInterop', :modular_headers => true
+
   config = use_native_modules!
 
   use_react_native!(
@@ -30,5 +39,11 @@ target 'Wondertide' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |build_config|
+        build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+      end
+    end
   end
 end

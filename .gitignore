@@ -41,6 +41,26 @@ node_modules/
 npm-debug.log
 yarn-error.log
 
+# Secrets and signing material
+# Keep local environment files, Apple signing credentials, Firebase service
+# configuration, and server credentials out of source control.
+.env
+.env.*
+!.env.example
+*.p8
+*.p12
+*.mobileprovision
+*.provisionprofile
+*.cer
+*.jks
+*.keystore
+**/GoogleService-Info.plist
+**/google-services.json
+**/*service-account*.json
+**/*service_account*.json
+**/firebase-adminsdk-*.json
+**/AuthKey_*.p8
+
 # fastlane
 #
 # It is recommended to not store the screenshots in the git repo. Instead, use fastlane to re-generate the

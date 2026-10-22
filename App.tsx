@@ -1,45 +1,59 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React, { useEffect } from 'react';
+import { StatusBar } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { GameNavigator } from './src/navigation/GameNavigator';
+import { ensureGameAccount } from './src/services/supabase/authService';
+import { listenForAuthRedirects } from './src/services/supabase/authService';
+import { startCloudSync } from './src/services/supabase/cloudSync';
+import { supabase } from './src/services/supabase/supabase';
 
 function App() {
-  const isDarkMode = useColorScheme() === 'dark';
-
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
+      <StatusBar barStyle="light-content" />
+      <GameBootstrap />
     </SafeAreaProvider>
   );
 }
 
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
+function GameBootstrap() {
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    let syncingAccountId: string | undefined;
 
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
-  );
+    async function syncAccount(accountId: string) {
+      if (syncingAccountId === accountId) return;
+      unsubscribe?.();
+      syncingAccountId = accountId;
+      const subscription = await startCloudSync(accountId);
+      unsubscribe = subscription;
+    }
+
+    ensureGameAccount()
+      .then(account => syncAccount(account.id))
+      .catch(error => {
+        console.warn('Supabase başlatılamadı:', error);
+      });
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session?.user) {
+          syncAccount(session.user.id).catch(error => {
+            console.warn('Bulut kaydı yüklenemedi:', error);
+          });
+        }
+      },
+    );
+
+    const stopListening = listenForAuthRedirects();
+    return () => {
+      unsubscribe?.();
+      stopListening();
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  return <GameNavigator />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
 
 export default App;
