@@ -24,7 +24,7 @@ export function TaskRewardModal({ task, location, scene, onClose }: Props) {
     <ImageBackground source={scene} style={styles.scene} imageStyle={styles.sceneImage}>
       <View style={styles.titleArea}>
         <Text style={styles.kicker}>{location.toUpperCase()} · GÖREV TAMAMLANDI</Text>
-        <Text style={styles.title}>{task.title}</Text>
+        <Text numberOfLines={2} adjustsFontSizeToFit style={styles.title}>{task.title}</Text>
         <Animated.View style={[styles.stars, { opacity: stars, transform: [{ scale: stars }] }]}>
           <Text style={styles.star}>★</Text><Text style={styles.star}>★</Text><Text style={styles.star}>★</Text>
         </Animated.View>
@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
   sceneImage: { resizeMode: 'cover' },
   titleArea: { alignItems: 'center', paddingTop: 78 },
   kicker: { color: '#FFF5D4', fontSize: 12, fontWeight: '900', letterSpacing: 2.4, textShadowColor: '#70411D', textShadowRadius: 5 },
-  title: { color: '#FFF9E8', fontSize: 43, fontWeight: '900', lineHeight: 42, textAlign: 'center', textShadowColor: '#71411D', textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 3, marginTop: 4 },
+  title: { maxWidth: '90%', color: '#FFF9E8', fontSize: 36, fontWeight: '900', lineHeight: 39, textAlign: 'center', textShadowColor: '#71411D', textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 3, marginTop: 4 },
   stars: { flexDirection: 'row', gap: 8, marginTop: 10 }, star: { color: '#FFD342', fontSize: 35, textShadowColor: '#AA6718', textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 2 },
   rewardArea: { alignItems: 'center', paddingHorizontal: 21, paddingBottom: 29 },
   rewardLabel: { color: '#6A4829', backgroundColor: '#FFF0C7', borderRadius: 14, paddingHorizontal: 23, paddingVertical: 6, fontWeight: '900', fontSize: 13, zIndex: 1, marginBottom: -8, borderWidth: 2, borderColor: '#E4B76D' },

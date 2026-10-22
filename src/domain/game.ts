@@ -3,6 +3,8 @@ export type ResourceKind = 'driftwood' | 'seaGlass' | 'shell';
 export type MergeTile = {
   id: string;
   kind: ResourceKind;
+  /** A tile must be merged with another tile at the same level. */
+  level: 1 | 2 | 3;
 };
 
 export type StoryProgress = {
@@ -25,6 +27,8 @@ export type PlayerState = {
   storyProgress: StoryProgress;
   mergeCount: number;
   generatedTileCount: number;
+  generationQueue: ResourceKind[];
+  endlessProjectCount: number;
   hasSeenIntro: boolean;
   lastSavedAt: string;
 };

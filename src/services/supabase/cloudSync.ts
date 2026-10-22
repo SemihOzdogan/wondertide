@@ -16,6 +16,8 @@ function stateFromStore(state: PlayerState): PlayerState {
     storyProgress: state.storyProgress,
     mergeCount: state.mergeCount,
     generatedTileCount: state.generatedTileCount,
+    generationQueue: state.generationQueue,
+    endlessProjectCount: state.endlessProjectCount,
     hasSeenIntro: state.hasSeenIntro,
     lastSavedAt: state.lastSavedAt,
   };

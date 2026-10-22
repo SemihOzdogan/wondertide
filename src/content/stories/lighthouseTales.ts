@@ -8,7 +8,7 @@ export const lighthouseTales: StoryChapter = {
   introduction: 'Gelgit çekildiğinde, kıyıda eski bir fenerin ışığı yeniden parladı.',
   mapIcon: '🗼',
   tasks: [
-    { id: 'clear-garden', title: 'Bahçeyi temizle', description: 'Yolun önündeki yosunları ve enkazı kaldır.', requirements: { driftwood: 2, seaGlass: 2, shell: 1 }, reward: { coins: 120 } },
-    { id: 'restore-pier', title: 'İskeleyi onar', description: 'Kasabaya gelen ilk tekne için iskeleyi hazırla.', requirements: { driftwood: 5, seaGlass: 2, shell: 1 }, reward: { coins: 250, gems: 2 } },
+    { id: 'clear-garden', title: 'Bahçeyi temizle', description: 'Yolun önündeki yosunları ve enkazı kaldır.', requirements: { driftwood: 1, seaGlass: 1, shell: 1 }, reward: { coins: 120 } },
+    { id: 'restore-pier', title: 'İskeleyi onar', description: 'Kasabaya gelen ilk tekne için iskeleyi hazırla.', requirements: { driftwood: 2, seaGlass: 1, shell: 1 }, reward: { coins: 250, gems: 2 } },
   ],
 };

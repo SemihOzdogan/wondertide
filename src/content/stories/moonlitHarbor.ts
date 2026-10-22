@@ -8,7 +8,7 @@ export const moonlitHarbor: StoryChapter = {
   introduction: 'Uzakta bir çan çalıyor. Limanın sisleri arasından yeni bir hikâye beliriyor.',
   mapIcon: '🌙',
   tasks: [
-    { id: 'light-lanterns', title: 'Fenerleri yak', description: 'Liman yolunu aydınlatmak için eski fenerleri onar.', requirements: { driftwood: 2, seaGlass: 4, shell: 3 }, reward: { coins: 360, gems: 3 } },
-    { id: 'wake-harbor', title: 'Limanı uyandır', description: 'İlk gece teknesi için rıhtımı hazırla.', requirements: { driftwood: 5, seaGlass: 4, shell: 2 }, reward: { coins: 600, gems: 5 } },
+    { id: 'light-lanterns', title: 'Fenerleri yak', description: 'Liman yolunu aydınlatmak için eski fenerleri onar.', requirements: { driftwood: 1, seaGlass: 2, shell: 1 }, reward: { coins: 360, gems: 3 } },
+    { id: 'wake-harbor', title: 'Limanı uyandır', description: 'İlk gece teknesi için rıhtımı hazırla.', requirements: { driftwood: 2, seaGlass: 2, shell: 1 }, reward: { coins: 600, gems: 5 } },
   ],
 };

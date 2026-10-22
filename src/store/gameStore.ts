@@ -9,20 +9,21 @@ const initialPlayerState: PlayerState = {
   energy: 86, maxEnergy: 100, lastEnergyRefreshAt: new Date().toISOString(), coins: 1230, gems: 45, dailyStreak: 0, lastDailyRewardAt: null,
   inventory: { driftwood: 0, seaGlass: 0, shell: 0 },
   board: [
-    { id: 'start-wood-a', kind: 'driftwood' },
-    { id: 'start-wood-b', kind: 'driftwood' },
-    { id: 'start-glass-a', kind: 'seaGlass' },
-    { id: 'start-glass-b', kind: 'seaGlass' },
-    { id: 'start-shell-a', kind: 'shell' },
+    { id: 'start-wood-a', kind: 'driftwood', level: 1 },
+    { id: 'start-wood-b', kind: 'driftwood', level: 1 },
+    { id: 'start-glass-a', kind: 'seaGlass', level: 1 },
+    { id: 'start-glass-b', kind: 'seaGlass', level: 1 },
+    { id: 'start-shell-a', kind: 'shell', level: 1 },
     ...Array(25).fill(null),
   ],
   storyProgress: { chapterId: 'lighthouse-tales', unlockedChapterIds: ['lighthouse-tales'], completedTaskIds: [], restoredAreaIds: [] },
-  mergeCount: 0, generatedTileCount: 0, hasSeenIntro: false, lastSavedAt: new Date().toISOString(),
+  mergeCount: 0, generatedTileCount: 0, generationQueue: ['driftwood', 'seaGlass', 'shell', 'driftwood', 'seaGlass', 'shell'], endlessProjectCount: 0, hasSeenIntro: false, lastSavedAt: new Date().toISOString(),
 };
 
 type GameStore = PlayerState & {
   generateTile: () => void;
   mergeTiles: (firstTileId: string, secondTileId: string) => boolean;
+  deliverProjectTile: (tileId: string) => boolean;
   moveTile: (tileId: string, targetIndex: number) => boolean;
   refreshEnergy: () => void;
   canClaimDailyReward: () => boolean;
@@ -31,6 +32,7 @@ type GameStore = PlayerState & {
   unlockChapter: (chapterId: string) => void;
   canComplete: (task: StoryTask) => boolean;
   completeTask: (task: StoryTask) => boolean;
+  completeEndlessProject: (task: StoryTask) => boolean;
   hydrate: (player: Partial<PlayerState>) => void;
   dismissIntro: () => void;
 };
@@ -38,6 +40,34 @@ type GameStore = PlayerState & {
 const resourceOrder: ResourceKind[] = ['driftwood', 'seaGlass', 'shell'];
 const energyIntervalMs = 5 * 60 * 1000;
 const boardCapacity = 30;
+const maximumTileLevel = 3;
+
+export function getEndlessProject(completedCount: number): StoryTask {
+  const tier = Math.floor(completedCount / 3) + 1;
+  const rotation = completedCount % resourceOrder.length;
+  const primary = resourceOrder[rotation];
+  const secondary = resourceOrder[(rotation + 1) % resourceOrder.length];
+  const requirements: Partial<Record<ResourceKind, number>> = { [primary]: Math.min(4, tier + 1) };
+  if (tier > 1) requirements[secondary] = Math.min(3, tier);
+  return {
+    id: `tide-contract-${completedCount}`,
+    title: `Kıyı sözleşmesi ${completedCount + 1}`,
+    description: tier === 1 ? 'Kıyının günlük onarımı için bir proje parçası hazırla.' : 'Değişen gelgit için kıyı savunmasını güçlendir.',
+    requirements,
+    reward: { coins: 180 + tier * 70, gems: completedCount > 0 && (completedCount + 1) % 5 === 0 ? 2 : 0 },
+  };
+}
+
+function createGenerationBatch(seed: number): ResourceKind[] {
+  const batch = [...resourceOrder, ...resourceOrder];
+  let value = (seed + 1) * 48271;
+  for (let index = batch.length - 1; index > 0; index -= 1) {
+    value = (value * 16807) % 2147483647;
+    const swapIndex = value % (index + 1);
+    [batch[index], batch[swapIndex]] = [batch[swapIndex], batch[index]];
+  }
+  return batch;
+}
 
 function isSameLocalDay(first: string, second: string) {
   const a = new Date(first);
@@ -66,7 +96,15 @@ function normalizePlayer(player: Partial<PlayerState>): PlayerState {
     : merged.lastEnergyRefreshAt;
   const sourceBoard = Array.isArray(merged.board) ? merged.board : initialPlayerState.board;
   const board = [...sourceBoard.slice(0, boardCapacity), ...Array(Math.max(0, boardCapacity - sourceBoard.length)).fill(null)]
-    .map(tile => tile ? { id: tile.id, kind: tile.kind } : null);
+    .map(tile => tile ? {
+      id: tile.id,
+      kind: tile.kind,
+      // Saved games created before levels existed are valid level-one tiles.
+      level: tile.level === 2 || tile.level === 3 ? tile.level : 1,
+    } : null);
+  const generationQueue = Array.isArray(merged.generationQueue)
+    ? merged.generationQueue.filter((kind): kind is ResourceKind => resourceOrder.includes(kind as ResourceKind))
+    : initialPlayerState.generationQueue;
   const unlockedChapterIds = [...new Set(merged.storyProgress.unlockedChapterIds)];
   storyChapters.forEach((chapter, index) => {
     if (chapter.tasks.every(task => merged.storyProgress.completedTaskIds.includes(task.id))) {
@@ -77,7 +115,7 @@ function normalizePlayer(player: Partial<PlayerState>): PlayerState {
   const chapterId = unlockedChapterIds.includes(merged.storyProgress.chapterId)
     ? merged.storyProgress.chapterId
     : initialPlayerState.storyProgress.chapterId;
-  return { ...merged, board, energy, lastEnergyRefreshAt,
+  return { ...merged, board, generationQueue: generationQueue.length ? generationQueue : createGenerationBatch(merged.generatedTileCount), energy, lastEnergyRefreshAt,
     storyProgress: { ...merged.storyProgress, chapterId, unlockedChapterIds } };
 }
 
@@ -90,14 +128,20 @@ export const useGameStore = create<GameStore>()(
         const currentBoard = [...state.board, ...Array(Math.max(0, boardCapacity - state.board.length)).fill(null)];
         const emptyIndex = currentBoard.findIndex(tile => tile === null);
         if (state.energy < 1 || emptyIndex === -1) return;
-        const resource = resourceOrder[state.generatedTileCount % resourceOrder.length];
+        const generationQueue = state.generationQueue.length
+          ? [...state.generationQueue]
+          : createGenerationBatch(state.generatedTileCount);
+        const resource = generationQueue.shift()!;
         const tile: MergeTile = {
           id: `${Date.now()}-${state.generatedTileCount}`,
           kind: resource,
+          level: 1,
         };
         const board = [...currentBoard];
         board[emptyIndex] = tile;
-        set({ energy: state.energy - 1, board, generatedTileCount: state.generatedTileCount + 1,
+        const generatedTileCount = state.generatedTileCount + 1;
+        const nextGenerationQueue = generationQueue.length ? generationQueue : createGenerationBatch(generatedTileCount);
+        set({ energy: state.energy - 1, board, generatedTileCount, generationQueue: nextGenerationQueue,
           lastSavedAt: new Date().toISOString() });
       },
       refreshEnergy: () => {
@@ -113,16 +157,27 @@ export const useGameStore = create<GameStore>()(
         const secondIndex = state.board.findIndex(tile => tile?.id === secondTileId);
         const first = state.board[firstIndex];
         const second = state.board[secondIndex];
-        if (!first || !second || first.id === second.id || first.kind !== second.kind) return false;
+        if (!first || !second || first.id === second.id || first.kind !== second.kind || first.level !== second.level) return false;
 
         const board = [...state.board];
         board[firstIndex] = null;
-        board[secondIndex] = null;
-        const inventory = { ...state.inventory };
-        inventory[first.kind] += 1;
+        if (first.level === maximumTileLevel) return false;
+        board[secondIndex] = { ...second, level: (first.level + 1) as MergeTile['level'] };
 
-        set({ board, inventory, mergeCount: state.mergeCount + 1,
+        set({ board, mergeCount: state.mergeCount + 1,
           lastSavedAt: new Date().toISOString() });
+        return true;
+      },
+      deliverProjectTile: tileId => {
+        const state = get();
+        const tileIndex = state.board.findIndex(tile => tile?.id === tileId);
+        const tile = state.board[tileIndex];
+        if (!tile || tile.level !== maximumTileLevel) return false;
+
+        const board = [...state.board];
+        const inventory = { ...state.inventory, [tile.kind]: state.inventory[tile.kind] + 1 };
+        board[tileIndex] = null;
+        set({ board, inventory, lastSavedAt: new Date().toISOString() });
         return true;
       },
       moveTile: (tileId, targetIndex) => {
@@ -188,6 +243,24 @@ export const useGameStore = create<GameStore>()(
             completedTaskIds,
             unlockedChapterIds,
             restoredAreaIds: [...state.storyProgress.restoredAreaIds, task.id] },
+          lastSavedAt: new Date().toISOString() });
+        return true;
+      },
+      completeEndlessProject: task => {
+        const state = get();
+        const chapter = storyChapters.find(candidate => candidate.id === state.storyProgress.chapterId);
+        const isStoryFinished = chapter?.id === storyChapters[storyChapters.length - 1]?.id
+          && chapter.tasks.every(candidate => state.storyProgress.completedTaskIds.includes(candidate.id));
+        const expectedTask = getEndlessProject(state.endlessProjectCount);
+        if (!isStoryFinished || task.id !== expectedTask.id || !get().canComplete(task)) return false;
+        const inventory = { ...state.inventory };
+        Object.entries(task.requirements).forEach(([resource, required]) => {
+          const key = resource as ResourceKind;
+          inventory[key] -= required ?? 0;
+        });
+        set({ inventory, coins: state.coins + task.reward.coins,
+          gems: state.gems + (task.reward.gems ?? 0),
+          endlessProjectCount: state.endlessProjectCount + 1,
           lastSavedAt: new Date().toISOString() });
         return true;
       },

@@ -33,7 +33,7 @@ export function StoryMapSheet({ visible, chapters, activeChapterId, unlockedChap
           {active ? <Text style={styles.playing}>Oynanıyor</Text> : completedCount === chapter.tasks.length ? <Text style={styles.done}>✓</Text> : null}
         </Pressable>;
       })}{<TaskList chapter={activeChapter} completedTaskIds={completedTaskIds} inventory={inventory} />}</ScrollView>
-      <Pressable onPress={onClose} style={styles.close}><Text style={styles.closeText}>Haritayı kapat</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Hikâye haritasını kapat" onPress={onClose} style={styles.close}><Text style={styles.closeText}>Haritayı kapat</Text></Pressable>
     </View></View>
   </Modal>;
 }
@@ -49,7 +49,7 @@ function TaskRow({ task, index, completed, locked, inventory }: { task: StoryTas
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(16, 35, 45, 0.42)', justifyContent: 'flex-end' },
   sheet: { maxHeight: '88%', backgroundColor: '#FFF4D9', padding: 22, paddingBottom: 30, borderTopLeftRadius: 28, borderTopRightRadius: 28 }, handle: { width: 42, height: 5, borderRadius: 5, backgroundColor: '#D6BFA0', alignSelf: 'center', marginBottom: 18 },
   title: { color: '#513C2D', fontSize: 24, fontWeight: '900' }, body: { color: '#81644A', marginTop: 5, marginBottom: 16, lineHeight: 19 },
   chapterList: { paddingBottom: 2 }, chapter: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFDF7', padding: 14, borderRadius: 17, borderWidth: 1, borderColor: '#E5CEAD', marginBottom: 10 }, active: { borderColor: '#EF9C37', borderWidth: 2, backgroundColor: '#FFF0C8' }, locked: { opacity: 0.55 }, icon: { fontSize: 32, marginRight: 12 }, chapterCopy: { flex: 1 }, chapterLabel: { color: '#A6825C', fontSize: 10, fontWeight: '900', letterSpacing: 1 }, chapterTitle: { color: '#513C2D', fontWeight: '900', fontSize: 17, marginTop: 1 }, chapterBody: { color: '#81644A', fontSize: 12, marginTop: 2 }, playing: { color: '#348D39', fontWeight: '900', fontSize: 11 }, done: { color: '#348D39', fontSize: 18, fontWeight: '900' },
