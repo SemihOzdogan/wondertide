@@ -32,3 +32,34 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
     signIn: jest.fn(),
   },
 }));
+
+jest.mock('@invertase/react-native-apple-authentication', () => {
+  const AppleButton = () => null;
+  AppleButton.Style = { BLACK: 'Black' };
+  AppleButton.Type = { SIGN_IN: 'SignIn', SIGN_UP: 'SignUp' };
+  return {
+    AppleButton,
+    appleAuth: {
+      Error: { CANCELED: '1001' },
+      Operation: { LOGIN: 'LOGIN' },
+      Scope: { FULL_NAME: 'FULL_NAME', EMAIL: 'EMAIL' },
+      performRequest: jest.fn(),
+    },
+  };
+});
+
+jest.mock('lucide-react-native', () => {
+  const Icon = () => null;
+  return {
+    Apple: Icon,
+    ChevronLeft: Icon,
+    ChevronRight: Icon,
+    CircleCheck: Icon,
+    Cloud: Icon,
+    Gift: Icon,
+    LockKeyhole: Icon,
+    Mail: Icon,
+    ShieldCheck: Icon,
+    UserRound: Icon,
+  };
+});

@@ -48,6 +48,7 @@ test('merging two equal tiles upgrades the tile instead of immediately adding in
   expect(useGameStore.getState().board[0]).toBeNull();
   expect(useGameStore.getState().board[1]).toMatchObject({ id: 'wood-two', kind: 'driftwood', level: 2 });
   expect(useGameStore.getState().inventory.driftwood).toBe(0);
+  expect(useGameStore.getState().coins).toBe(5);
 });
 
 test('does not merge tiles with different levels', () => {
@@ -86,6 +87,8 @@ test('does not merge completed project pieces', () => {
   });
 
   expect(useGameStore.getState().mergeTiles('shell-one', 'shell-two')).toBe(false);
+  expect(useGameStore.getState().board[0]).toMatchObject({ id: 'shell-one', level: 3 });
+  expect(useGameStore.getState().board[1]).toMatchObject({ id: 'shell-two', level: 3 });
 });
 
 test('uses the visible generation queue instead of selecting the task requirement', () => {
@@ -126,12 +129,13 @@ test('refills the next-resource preview when a generation batch is exhausted', (
 
 test('creates an increasingly repeatable project after the story is finished', () => {
   const completedTaskIds = storyChapters.flatMap(chapter => chapter.tasks.map(task => task.id));
+  const finalChapter = storyChapters[storyChapters.length - 1];
   const firstContract = getEndlessProject(0);
   useGameStore.setState({
     endlessProjectCount: 0,
     inventory: { driftwood: 2, seaGlass: 2, shell: 2 },
     storyProgress: {
-      chapterId: 'stormwatch-cliffs',
+      chapterId: finalChapter.id,
       unlockedChapterIds: storyChapters.map(chapter => chapter.id),
       completedTaskIds,
       restoredAreaIds: completedTaskIds,

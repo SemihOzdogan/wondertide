@@ -5,23 +5,26 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { storyChapters } from '../content/stories';
 import type { MergeTile, PlayerState, ResourceKind, StoryTask } from '../domain/game';
 
+const initialBoard: Array<MergeTile | null> = Array.from({ length: 30 }, (_, index) => ({
+  id: `start-${index}`,
+  kind: (['driftwood', 'seaGlass', 'shell'] as ResourceKind[])[index % 3],
+  level: 1,
+}));
+
 const initialPlayerState: PlayerState = {
   energy: 86, maxEnergy: 100, lastEnergyRefreshAt: new Date().toISOString(), coins: 1230, gems: 45, dailyStreak: 0, lastDailyRewardAt: null,
   inventory: { driftwood: 0, seaGlass: 0, shell: 0 },
-  board: [
-    { id: 'start-wood-a', kind: 'driftwood', level: 1 },
-    { id: 'start-wood-b', kind: 'driftwood', level: 1 },
-    { id: 'start-glass-a', kind: 'seaGlass', level: 1 },
-    { id: 'start-glass-b', kind: 'seaGlass', level: 1 },
-    { id: 'start-shell-a', kind: 'shell', level: 1 },
-    ...Array(25).fill(null),
-  ],
+  board: initialBoard,
   storyProgress: { chapterId: 'lighthouse-tales', unlockedChapterIds: ['lighthouse-tales'], completedTaskIds: [], restoredAreaIds: [] },
   mergeCount: 0, generatedTileCount: 0, generationQueue: ['driftwood', 'seaGlass', 'shell', 'driftwood', 'seaGlass', 'shell'], endlessProjectCount: 0, hasSeenIntro: false, lastSavedAt: new Date().toISOString(),
 };
 
 type GameStore = PlayerState & {
   generateTile: () => void;
+  spendCoins: (amount: number) => boolean;
+  spendGems: (amount: number) => boolean;
+  buyEnergyWithCoins: () => boolean;
+  buyEnergyWithGems: () => boolean;
   mergeTiles: (firstTileId: string, secondTileId: string) => boolean;
   deliverProjectTile: (tileId: string) => boolean;
   moveTile: (tileId: string, targetIndex: number) => boolean;
@@ -94,7 +97,9 @@ function normalizePlayer(player: Partial<PlayerState>): PlayerState {
   const lastEnergyRefreshAt = recovered
     ? new Date(new Date(merged.lastEnergyRefreshAt).getTime() + recovered * energyIntervalMs).toISOString()
     : merged.lastEnergyRefreshAt;
-  const sourceBoard = Array.isArray(merged.board) ? merged.board : initialPlayerState.board;
+  const savedBoard = Array.isArray(merged.board) ? merged.board : initialPlayerState.board;
+  const isUnplayedLegacyBoard = merged.generatedTileCount === 0 && merged.mergeCount === 0 && savedBoard.filter(Boolean).length <= 6;
+  const sourceBoard = isUnplayedLegacyBoard ? initialBoard : savedBoard;
   const board = [...sourceBoard.slice(0, boardCapacity), ...Array(Math.max(0, boardCapacity - sourceBoard.length)).fill(null)]
     .map(tile => tile ? {
       id: tile.id,
@@ -144,6 +149,28 @@ export const useGameStore = create<GameStore>()(
         set({ energy: state.energy - 1, board, generatedTileCount, generationQueue: nextGenerationQueue,
           lastSavedAt: new Date().toISOString() });
       },
+      spendCoins: amount => {
+        if (!Number.isFinite(amount) || amount <= 0 || get().coins < amount) return false;
+        set({ coins: get().coins - amount, lastSavedAt: new Date().toISOString() });
+        return true;
+      },
+      spendGems: amount => {
+        if (!Number.isFinite(amount) || amount <= 0 || get().gems < amount) return false;
+        set({ gems: get().gems - amount, lastSavedAt: new Date().toISOString() });
+        return true;
+      },
+      buyEnergyWithCoins: () => {
+        const state = get();
+        if (state.energy >= state.maxEnergy || state.coins < 100) return false;
+        set({ coins: state.coins - 100, energy: Math.min(state.maxEnergy, state.energy + 5), lastSavedAt: new Date().toISOString() });
+        return true;
+      },
+      buyEnergyWithGems: () => {
+        const state = get();
+        if (state.energy >= state.maxEnergy || state.gems < 1) return false;
+        set({ gems: state.gems - 1, energy: Math.min(state.maxEnergy, state.energy + 10), lastSavedAt: new Date().toISOString() });
+        return true;
+      },
       refreshEnergy: () => {
         const state = get();
         const refreshed = normalizePlayer(state);
@@ -159,12 +186,13 @@ export const useGameStore = create<GameStore>()(
         const second = state.board[secondIndex];
         if (!first || !second || first.id === second.id || first.kind !== second.kind || first.level !== second.level) return false;
 
+        if (first.level === maximumTileLevel) return false;
         const board = [...state.board];
         board[firstIndex] = null;
-        if (first.level === maximumTileLevel) return false;
         board[secondIndex] = { ...second, level: (first.level + 1) as MergeTile['level'] };
 
-        set({ board, mergeCount: state.mergeCount + 1,
+        const mergeReward = first.level * 5;
+        set({ board, coins: state.coins + mergeReward, mergeCount: state.mergeCount + 1,
           lastSavedAt: new Date().toISOString() });
         return true;
       },
