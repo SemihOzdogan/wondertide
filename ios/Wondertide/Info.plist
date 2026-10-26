@@ -4,10 +4,10 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>tr</string>
 	<key>CFBundleAllowMixedLocalizations</key>
 	<true/>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>tr</string>
 	<key>CFBundleDisplayName</key>
 	<string>Wondertide</string>
 	<key>CFBundleExecutable</key>
