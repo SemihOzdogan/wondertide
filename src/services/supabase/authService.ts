@@ -79,6 +79,17 @@ export async function signOutToGuest(): Promise<GameAccount> {
   return ensureGameAccount();
 }
 
+/** Permanently removes the signed-in account and its cascaded cloud save. */
+export async function deleteCurrentAccount(): Promise<void> {
+  const { error } = await supabase.rpc('delete_current_user');
+  if (error) throw error;
+
+  // Removing the server-side user does not reliably clear the local session on
+  // every device, so clear it before the UI starts a fresh anonymous session.
+  const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
+  if (signOutError) throw signOutError;
+}
+
 export async function signInWithOAuth(provider: 'google' | 'apple') {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
