@@ -30,6 +30,8 @@ export type PlayerState = {
   generationQueue: ResourceKind[];
   endlessProjectCount: number;
   hasSeenIntro: boolean;
+  tutorialPhase: 'welcome' | 'board' | 'complete';
+  tutorialVersion: number;
   lastSavedAt: string;
 };
 

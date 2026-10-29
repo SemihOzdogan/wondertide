@@ -1,8 +1,10 @@
 import React, { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { CopilotProvider } from 'react-native-copilot';
 
 import { GameNavigator } from './src/navigation/GameNavigator';
+import { CopilotTooltip } from './src/features/game/CopilotTooltip';
 import { ensureGameAccount } from './src/services/supabase/authService';
 import { listenForAuthRedirects } from './src/services/supabase/authService';
 import { startCloudSync } from './src/services/supabase/cloudSync';
@@ -12,7 +14,9 @@ function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" />
-      <GameBootstrap />
+      <CopilotProvider overlay="svg" animated backdropColor="rgba(4, 24, 36, 0.76)" tooltipComponent={CopilotTooltip}>
+        <GameBootstrap />
+      </CopilotProvider>
     </SafeAreaProvider>
   );
 }

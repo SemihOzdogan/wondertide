@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { storyChapters } from '../content/stories';
 import type { MergeTile, PlayerState, ResourceKind, StoryTask } from '../domain/game';
+import { mergeBoardTiles, projectTileLevel } from '../domain/gameEngine';
 
 const initialBoard: Array<MergeTile | null> = Array.from({ length: 30 }, (_, index) => ({
   id: `start-${index}`,
@@ -16,7 +17,7 @@ const initialPlayerState: PlayerState = {
   inventory: { driftwood: 0, seaGlass: 0, shell: 0 },
   board: initialBoard,
   storyProgress: { chapterId: 'lighthouse-tales', unlockedChapterIds: ['lighthouse-tales'], completedTaskIds: [], restoredAreaIds: [] },
-  mergeCount: 0, generatedTileCount: 0, generationQueue: ['driftwood', 'seaGlass', 'shell', 'driftwood', 'seaGlass', 'shell'], endlessProjectCount: 0, hasSeenIntro: false, lastSavedAt: new Date().toISOString(),
+  mergeCount: 0, generatedTileCount: 0, generationQueue: ['driftwood', 'seaGlass', 'shell', 'driftwood', 'seaGlass', 'shell'], endlessProjectCount: 0, hasSeenIntro: false, tutorialPhase: 'welcome', tutorialVersion: 5, lastSavedAt: new Date().toISOString(),
 };
 
 type GameStore = PlayerState & {
@@ -37,13 +38,14 @@ type GameStore = PlayerState & {
   completeTask: (task: StoryTask) => boolean;
   completeEndlessProject: (task: StoryTask) => boolean;
   hydrate: (player: Partial<PlayerState>) => void;
+  beginGameTutorial: () => void;
   dismissIntro: () => void;
 };
 
 const resourceOrder: ResourceKind[] = ['driftwood', 'seaGlass', 'shell'];
 const energyIntervalMs = 5 * 60 * 1000;
 const boardCapacity = 30;
-const maximumTileLevel = 3;
+const maximumTileLevel = projectTileLevel;
 
 export function getEndlessProject(completedCount: number): StoryTask {
   const tier = Math.floor(completedCount / 3) + 1;
@@ -120,7 +122,9 @@ function normalizePlayer(player: Partial<PlayerState>): PlayerState {
   const chapterId = unlockedChapterIds.includes(merged.storyProgress.chapterId)
     ? merged.storyProgress.chapterId
     : initialPlayerState.storyProgress.chapterId;
-  return { ...merged, board, generationQueue: generationQueue.length ? generationQueue : createGenerationBatch(merged.generatedTileCount), energy, lastEnergyRefreshAt,
+  const isCurrentTutorial = player.tutorialVersion === initialPlayerState.tutorialVersion;
+  const tutorialPhase = isCurrentTutorial ? player.tutorialPhase ?? (merged.hasSeenIntro ? 'complete' : 'welcome') : 'welcome';
+  return { ...merged, hasSeenIntro: isCurrentTutorial ? merged.hasSeenIntro : false, tutorialPhase, tutorialVersion: initialPlayerState.tutorialVersion, board, generationQueue: generationQueue.length ? generationQueue : createGenerationBatch(merged.generatedTileCount), energy, lastEnergyRefreshAt,
     storyProgress: { ...merged.storyProgress, chapterId, unlockedChapterIds } };
 }
 
@@ -180,19 +184,9 @@ export const useGameStore = create<GameStore>()(
       },
       mergeTiles: (firstTileId, secondTileId) => {
         const state = get();
-        const firstIndex = state.board.findIndex(tile => tile?.id === firstTileId);
-        const secondIndex = state.board.findIndex(tile => tile?.id === secondTileId);
-        const first = state.board[firstIndex];
-        const second = state.board[secondIndex];
-        if (!first || !second || first.id === second.id || first.kind !== second.kind || first.level !== second.level) return false;
-
-        if (first.level === maximumTileLevel) return false;
-        const board = [...state.board];
-        board[firstIndex] = null;
-        board[secondIndex] = { ...second, level: (first.level + 1) as MergeTile['level'] };
-
-        const mergeReward = first.level * 5;
-        set({ board, coins: state.coins + mergeReward, mergeCount: state.mergeCount + 1,
+        const result = mergeBoardTiles(state.board, firstTileId, secondTileId);
+        if (!result.ok) return false;
+        set({ board: result.board, coins: state.coins + result.reward, mergeCount: state.mergeCount + 1,
           lastSavedAt: new Date().toISOString() });
         return true;
       },
@@ -293,8 +287,19 @@ export const useGameStore = create<GameStore>()(
         return true;
       },
       hydrate: player => set(normalizePlayer(player)),
-      dismissIntro: () => set({ hasSeenIntro: true, lastSavedAt: new Date().toISOString() }),
+      beginGameTutorial: () => set({ tutorialPhase: 'board', lastSavedAt: new Date().toISOString() }),
+      dismissIntro: () => set({ hasSeenIntro: true, tutorialPhase: 'complete', lastSavedAt: new Date().toISOString() }),
     }),
-    { name: 'wondertide-player', storage: createJSONStorage(() => AsyncStorage) },
+    {
+      name: 'wondertide-player',
+      storage: createJSONStorage(() => AsyncStorage),
+      version: 5,
+      migrate: persistedState => ({
+        ...(persistedState as Partial<PlayerState>),
+        hasSeenIntro: false,
+        tutorialPhase: 'welcome',
+        tutorialVersion: 5,
+      }),
+    },
   ),
 );

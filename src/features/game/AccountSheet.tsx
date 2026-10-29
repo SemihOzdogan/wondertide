@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { ChevronLeft, ChevronRight, CircleCheck, Cloud, Gift, LockKeyhole, Mail, UserRound } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, CircleCheck, CircleHelp, Cloud, Gift, LockKeyhole, Mail, UserRound } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import type { GameAccount } from '../../services/auth/authContract';
@@ -9,9 +9,9 @@ import { linkNativeGoogleIdentity, signInWithNativeGoogle } from '../../services
 import { deleteCurrentAccount, ensureGameAccount, getCurrentGameAccount, linkEmailToGuest, signInWithEmail, signOutToGuest } from '../../services/supabase/authService';
 import { useGameStore } from '../../store/gameStore';
 
-type Props = { visible: boolean; onClose: () => void };
+type Props = { visible: boolean; onClose: () => void; onStartTutorial: () => void };
 
-export function AccountSheet({ visible, onClose }: Props) {
+export function AccountSheet({ visible, onClose, onStartTutorial }: Props) {
   const dailyStreak = useGameStore(state => state.dailyStreak);
   const canClaimDailyReward = useGameStore(state => state.canClaimDailyReward);
   const claimDailyReward = useGameStore(state => state.claimDailyReward);
@@ -147,6 +147,11 @@ export function AccountSheet({ visible, onClose }: Props) {
         <View style={styles.handle} />
         <Text style={styles.title}>{account && !account.isAnonymous ? 'Profilin' : authStep === 'welcome' ? 'Profil' : mode === 'create' ? 'Hesabını güvene al' : 'Tekrar hoş geldin'}</Text>
         {loadingAccount ? <Text style={styles.status}>Hesap durumu kontrol ediliyor…</Text> : <><DailyRewardCard streak={dailyStreak} available={canClaimDailyReward()} onClaim={handleDailyReward} />{account && !account.isAnonymous ? <ProfileCard account={account} busy={busy} onSignOut={handleSignOut} onDeleteAccount={handleDeleteAccount} /> : <GuestAuthFlow mode={mode} step={authStep} email={email} password={password} busy={busy} activeProvider={activeProvider} onEmailChange={setEmail} onPasswordChange={setPassword} onGoogle={() => handleProvider('google')} onApple={() => handleProvider('apple')} onStartCreate={() => { setMode('create'); setAuthStep('choice'); }} onStartSignIn={() => { setMode('signIn'); setAuthStep('choice'); }} onOpenEmail={() => setAuthStep('email')} onBack={() => setAuthStep(authStep === 'email' ? 'choice' : 'welcome')} onSubmitEmail={linkEmail} />}</>}
+        <Pressable accessibilityRole="button" accessibilityLabel="Nasıl oynanır rehberini başlat" onPress={onStartTutorial} style={styles.tutorialAction}>
+          <View style={styles.tutorialIcon}><CircleHelp color="#2A6B8B" size={22} strokeWidth={2.5} /></View>
+          <View style={styles.tutorialCopy}><Text style={styles.tutorialTitle}>Nasıl oynanır?</Text><Text style={styles.tutorialBody}>Mira, hedefleri ve birleşimleri adım adım göstersin.</Text></View>
+          <ChevronRight color="#2A6B8B" size={21} strokeWidth={2.8} />
+        </Pressable>
         {notice ? <View style={styles.notice}><Text style={styles.noticeText}>{notice}</Text></View> : null}
         <Pressable onPress={onClose} style={styles.later}><Text style={styles.laterText}>Kapat</Text></Pressable>
       </View></ScrollView></KeyboardAvoidingView>;
@@ -227,6 +232,7 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'transparent' }, scroll: { flexGrow: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#FFF4D9', padding: 22, paddingBottom: 32, borderTopLeftRadius: 28, borderTopRightRadius: 28 }, handle: { width: 42, height: 5, borderRadius: 5, backgroundColor: '#D6BFA0', alignSelf: 'center', marginBottom: 18 },
   title: { color: '#513C2D', fontSize: 24, fontWeight: '900' }, body: { color: '#81644A', marginTop: 6, marginBottom: 18, lineHeight: 19 }, status: { color: '#81644A', marginTop: 10 }, notice: { marginTop: 14, padding: 12, borderRadius: 12, backgroundColor: '#E5F2FA', borderWidth: 1, borderColor: '#9FCBE0' }, noticeText: { color: '#2A6683', lineHeight: 18, fontWeight: '700', fontSize: 12 },
+  tutorialAction: { flexDirection: 'row', alignItems: 'center', marginTop: 16, padding: 13, borderRadius: 17, backgroundColor: '#E5F2FA', borderWidth: 1, borderColor: '#9FCBE0' }, tutorialIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: '#FFF' }, tutorialCopy: { flex: 1, marginHorizontal: 11 }, tutorialTitle: { color: '#2A6683', fontSize: 14, fontWeight: '900' }, tutorialBody: { color: '#527D91', fontSize: 11, lineHeight: 15, marginTop: 2, fontWeight: '600' },
   input: { flex: 1, paddingVertical: 13, paddingRight: 13, paddingLeft: 10, color: '#513C2D', fontSize: 15 }, inputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFDF7', borderWidth: 1, borderColor: '#E2CBAA', borderRadius: 14, paddingLeft: 13, marginBottom: 14 }, fieldLabel: { color: '#5E4838', fontWeight: '800', fontSize: 12, marginBottom: 6 },
   primary: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#4AA63A', paddingHorizontal: 16, borderRadius: 16, shadowColor: '#326D28', shadowOpacity: 0.24, shadowOffset: { width: 0, height: 3 }, shadowRadius: 5, elevation: 3 }, primaryText: { color: '#FFF', fontWeight: '900', fontSize: 16 }, or: { color: '#98795C', alignSelf: 'center', marginVertical: 12, fontWeight: '700' },
   profile: { marginTop: 16 }, profileHero: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 22, backgroundColor: '#E8F3D7', borderWidth: 1, borderColor: '#B9D99B', shadowColor: '#52713A', shadowOpacity: 0.16, shadowRadius: 8, elevation: 3 }, avatarFrame: { width: 68, height: 68, borderRadius: 34, padding: 3, backgroundColor: '#F9FFE9', borderWidth: 2, borderColor: '#7BB95E' }, googleAvatarFrame: { borderColor: '#6FA5FF' }, avatarImage: { width: '100%', height: '100%', borderRadius: 31 }, avatarFallback: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 31, backgroundColor: '#5B9D47' }, avatarText: { color: '#FFF', fontSize: 28, fontWeight: '900' }, profileCopy: { flex: 1, marginLeft: 13 }, profileName: { color: '#304D31', fontSize: 19, fontWeight: '900' }, profileEmail: { color: '#60795A', marginTop: 3, fontSize: 12 }, providerBadge: { alignSelf: 'flex-start', marginTop: 7, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 9, backgroundColor: 'rgba(255,255,255,0.72)' }, providerBadgeText: { color: '#547B43', fontWeight: '900', fontSize: 10 }, profileStatus: { flexDirection: 'row', alignItems: 'center', marginTop: 16, padding: 14, borderRadius: 17, backgroundColor: '#FFFDF7', borderWidth: 1, borderColor: '#E7D4B6' }, statusIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', marginRight: 11, borderRadius: 20, backgroundColor: '#E0F2FB' }, statusCopy: { flex: 1 }, statusTitle: { color: '#4B6654', fontWeight: '900' }, statusDetail: { color: '#876C53', fontSize: 11, lineHeight: 16, marginTop: 2 }, profileTip: { marginTop: 10, padding: 12, borderRadius: 13, backgroundColor: '#FFF0CF' }, profileTipText: { color: '#8A6636', fontSize: 12, lineHeight: 17, fontWeight: '700' }, signOut: { alignItems: 'center', justifyContent: 'center', minHeight: 46, marginTop: 16, borderRadius: 14, backgroundColor: '#FFF6F3', borderWidth: 1, borderColor: '#F0B9AC' }, signOutText: { color: '#B64E3B', fontWeight: '900' }, deleteAccount: { alignItems: 'center', justifyContent: 'center', minHeight: 48, marginTop: 10, borderRadius: 14, backgroundColor: '#FFE9E5', borderWidth: 1, borderColor: '#DF7665' }, deleteAccountText: { color: '#A64032', fontSize: 13, fontWeight: '900' },

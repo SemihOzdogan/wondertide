@@ -19,6 +19,8 @@ function stateFromStore(state: PlayerState): PlayerState {
     generationQueue: state.generationQueue,
     endlessProjectCount: state.endlessProjectCount,
     hasSeenIntro: state.hasSeenIntro,
+    tutorialPhase: state.tutorialPhase,
+    tutorialVersion: state.tutorialVersion,
     lastSavedAt: state.lastSavedAt,
   };
 }
