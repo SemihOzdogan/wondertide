@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
-import { StatusBar } from 'react-native';
+import { StatusBar, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { CopilotProvider } from 'react-native-copilot';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { GameNavigator } from './src/navigation/GameNavigator';
 import { CopilotTooltip } from './src/features/game/CopilotTooltip';
@@ -9,15 +10,18 @@ import { ensureGameAccount } from './src/services/supabase/authService';
 import { listenForAuthRedirects } from './src/services/supabase/authService';
 import { startCloudSync } from './src/services/supabase/cloudSync';
 import { supabase } from './src/services/supabase/supabase';
+import { initializeRewardedAds } from './src/services/ads/rewardedAd';
 
 function App() {
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle="light-content" />
-      <CopilotProvider overlay="svg" animated backdropColor="rgba(4, 24, 36, 0.76)" tooltipComponent={CopilotTooltip}>
-        <GameBootstrap />
-      </CopilotProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider>
+        <StatusBar barStyle="light-content" />
+        <CopilotProvider overlay="svg" animated backdropColor="rgba(4, 24, 36, 0.76)" tooltipComponent={CopilotTooltip}>
+          <GameBootstrap />
+        </CopilotProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -34,6 +38,7 @@ function GameBootstrap() {
       unsubscribe = subscription;
     }
 
+    initializeRewardedAds();
     ensureGameAccount()
       .then(account => syncAccount(account.id))
       .catch(error => {
@@ -61,3 +66,5 @@ function GameBootstrap() {
 }
 
 export default App;
+
+const styles = StyleSheet.create({ root: { flex: 1 } });

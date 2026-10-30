@@ -34,6 +34,22 @@ test('unlocks the next chapter when the current chapter is completed', () => {
   expect(useGameStore.getState().storyProgress.unlockedChapterIds).toContain('moonlit-harbor');
 });
 
+test('awards the chapter completion bonus after the final task', () => {
+  useGameStore.setState({
+    energy: 80,
+    maxEnergy: 100,
+    coins: 0,
+    gems: 0,
+    inventory: { driftwood: 10, seaGlass: 10, shell: 10 },
+  });
+
+  expect(useGameStore.getState().completeTask(lighthouseTales.tasks[0])).toBe(true);
+  expect(useGameStore.getState().completeTask(lighthouseTales.tasks[1])).toBe(true);
+  expect(useGameStore.getState().coins).toBe(210);
+  expect(useGameStore.getState().energy).toBe(90);
+  expect(useGameStore.getState().storyProgress.restoredAreaIds).toContain('lighthouse-tales');
+});
+
 test('merging two equal tiles upgrades the tile instead of immediately adding inventory', () => {
   useGameStore.setState({
     board: [
@@ -109,6 +125,33 @@ test('uses the visible generation queue instead of selecting the task requiremen
     'seaGlass',
     'driftwood',
   ]);
+});
+
+test('fills every available board space in one generation when energy allows', () => {
+  useGameStore.setState({
+    board: [null, null, null, ...Array(27).fill({ id: 'occupied', kind: 'shell', level: 1 })],
+    energy: 2,
+    generatedTileCount: 0,
+    generationQueue: ['shell', 'seaGlass', 'driftwood'],
+  });
+
+  expect(useGameStore.getState().generateTiles()).toBe(2);
+  expect(useGameStore.getState().board.slice(0, 3).map(tile => tile?.kind ?? null)).toEqual(['shell', 'seaGlass', null]);
+  expect(useGameStore.getState().energy).toBe(0);
+});
+
+test('awards a rewarded gem even when the energy bar is full', () => {
+  useGameStore.setState({
+    energy: 100,
+    maxEnergy: 100,
+    gems: 0,
+    rewardedAdWatchCount: 0,
+    lastRewardedAdAt: null,
+  });
+
+  expect(useGameStore.getState().canClaimRewardedGem()).toBe(true);
+  expect(useGameStore.getState().claimRewardedGem()).toBe(true);
+  expect(useGameStore.getState().gems).toBe(1);
 });
 
 test('refills the next-resource preview when a generation batch is exhausted', () => {

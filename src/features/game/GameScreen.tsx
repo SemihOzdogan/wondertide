@@ -1,16 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Image, ImageBackground, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Image, ImageBackground, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CopilotStep, useCopilot, walkthroughable } from 'react-native-copilot';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { storyChapters } from '../../content/stories';
 import type { MergeTile, ResourceKind, StoryTask } from '../../domain/game';
-import { getEndlessProject, useGameStore } from '../../store/gameStore';
+import { getChapterCompletionReward, getEndlessProject, useGameStore } from '../../store/gameStore';
 import { AccountSheet } from './AccountSheet';
 import { StoryMapSheet } from './StoryMapSheet';
 import { TaskRewardModal } from './TaskRewardModal';
+import { showRewardedEnergyAd } from '../../services/ads/rewardedAd';
 import type { RootStackParamList } from '../../navigation/types';
 
 const resources: ResourceKind[] = ['driftwood', 'seaGlass', 'shell'];
@@ -36,14 +38,16 @@ const itemImages: Record<ResourceKind, number> = {
   seaGlass: require('../../../assets/images/item-sea-glass.png'),
   shell: require('../../../assets/images/item-shell.png'),
 };
+let activeMossyTileIds = new Set<string>();
 const resourceNames: Record<ResourceKind, string> = { driftwood: 'Tahta', seaGlass: 'Cam', shell: 'Kabuk' };
 const CopilotNativeView = React.forwardRef<React.ComponentRef<typeof View>, React.ComponentProps<typeof View>>((props, ref) => <View {...props} ref={ref} collapsable={false} />);
 const CopilotView = walkthroughable(CopilotNativeView);
 const CopilotPressable = walkthroughable(Pressable);
 
-type Props = { mode: 'island' | 'board'; overlay?: 'tasks' | 'account'; overlayOpenId?: number; onOpenBoard?: () => void; hasBottomTab?: boolean };
+type Props = { mode: 'island' | 'board'; overlay?: 'tasks' | 'account'; overlayOpenId?: number; onOpenBoard?: () => void; onDismissOverlay?: () => void; hasBottomTab?: boolean };
+type TileFrame = { x: number; y: number; width: number; height: number };
 
-export function GameScreen({ mode, overlay, overlayOpenId, onOpenBoard, hasBottomTab = false }: Props) {
+export function GameScreen({ mode, overlay, overlayOpenId, onOpenBoard, onDismissOverlay, hasBottomTab = false }: Props) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const isFocused = useIsFocused();
@@ -59,10 +63,14 @@ export function GameScreen({ mode, overlay, overlayOpenId, onOpenBoard, hasBotto
   const burst = useRef(new Animated.Value(0)).current;
   const mergeFlash = useRef(new Animated.Value(0)).current;
   const sparkle = useRef(new Animated.Value(0)).current;
+  const boardRef = useRef<React.ComponentRef<typeof View>>(null);
+  const boardFrameRef = useRef<TileFrame | null>(null);
+  const tileFramesRef = useRef(new Map<string, TileFrame>());
   const tutorialStarted = useRef(false);
   const { start } = useCopilot();
   const store = useGameStore();
-  const { energy, maxEnergy, lastEnergyRefreshAt, coins, gems, inventory, board, storyProgress, endlessProjectCount, generationQueue, generatedTileCount, tutorialPhase } = store;
+  const { energy, maxEnergy, lastEnergyRefreshAt, coins, gems, inventory, board, storyProgress, endlessProjectCount, generationQueue, generatedTileCount, mossyCellIndices, tutorialPhase } = store;
+  activeMossyTileIds = new Set(board.flatMap((tile, index) => tile && mossyCellIndices.includes(index) ? [tile.id] : []));
   const occupiedTileCount = board.filter(Boolean).length;
   const activeChapter = storyChapters.find(chapter => chapter.id === storyProgress.chapterId) ?? storyChapters[0];
   const activeIndex = storyChapters.findIndex(chapter => chapter.id === activeChapter.id);
@@ -122,21 +130,54 @@ export function GameScreen({ mode, overlay, overlayOpenId, onOpenBoard, hasBotto
     if (overlay === 'account') setAccountVisible(true);
   }, [overlay, overlayOpenId]);
 
+  function animateMerge(firstTileId: string, secondTileId: string) {
+    const targetIndex = board.findIndex(candidate => candidate?.id === secondTileId);
+    if (!store.mergeTiles(firstTileId, secondTileId)) return false;
+    const clearedMoss = mossyCellIndices.includes(targetIndex);
+    if (clearedMoss) store.clearMossAt(targetIndex);
+    const selectedLevel = board.find(candidate => candidate?.id === firstTileId)?.level ?? 1;
+    setSelectedTileId(null); setBoardMessage(clearedMoss ? 'Yosun temizlendi! Hücre yeniden açıldı.' : `Birleşim tamamlandı! +${selectedLevel * 5} altın`); setShowBurst(true); burst.setValue(0.55); mergeFlash.setValue(0); sparkle.setValue(0);
+    Animated.parallel([
+      Animated.sequence([Animated.spring(burst, { toValue: 1, friction: 4, useNativeDriver: true }), Animated.timing(burst, { toValue: 1.45, duration: 360, useNativeDriver: true })]),
+      Animated.sequence([Animated.timing(mergeFlash, { toValue: 0.75, duration: 90, useNativeDriver: true }), Animated.timing(mergeFlash, { toValue: 0, duration: 420, useNativeDriver: true })]),
+      Animated.timing(sparkle, { toValue: 1, duration: 480, useNativeDriver: true }),
+    ]).start(() => setShowBurst(false));
+    return true;
+  }
+
   function selectTile(tileId: string) {
     const tile = board.find(candidate => candidate?.id === tileId);
+    const tileIndex = board.findIndex(candidate => candidate?.id === tileId);
+    if (!selectedTileId && mossyCellIndices.includes(tileIndex)) { setBoardMessage('Yosunlu hücreyi temizlemek için başka bir parçayı bunun üzerine birleştir.'); return; }
     if (!selectedTileId) { setSelectedTileId(tileId); setBoardMessage(tile?.level === 3 ? 'Proje parçası hazır. Aşağıdaki Teslim Et düğmesine dokun.' : 'Şimdi eşleşen ikinci parçayı seç.'); return; }
     if (selectedTileId === tileId) { setSelectedTileId(null); setBoardMessage('Seçim kaldırıldı.'); return; }
-    if (store.mergeTiles(selectedTileId, tileId)) {
-      const selectedLevel = board.find(candidate => candidate?.id === selectedTileId)?.level ?? 1;
-      setSelectedTileId(null); setBoardMessage(`Birleşim tamamlandı! +${selectedLevel * 5} altın`); setShowBurst(true); burst.setValue(0.55); mergeFlash.setValue(0); sparkle.setValue(0);
-      Animated.parallel([
-        Animated.sequence([Animated.spring(burst, { toValue: 1, friction: 4, useNativeDriver: true }), Animated.timing(burst, { toValue: 1.45, duration: 360, useNativeDriver: true })]),
-        Animated.sequence([Animated.timing(mergeFlash, { toValue: 0.75, duration: 90, useNativeDriver: true }), Animated.timing(mergeFlash, { toValue: 0, duration: 420, useNativeDriver: true })]),
-        Animated.timing(sparkle, { toValue: 1, duration: 480, useNativeDriver: true }),
-      ]).start(() => setShowBurst(false));
-      return;
-    }
+    if (animateMerge(selectedTileId, tileId)) return;
     setSelectedTileId(tileId); setBoardMessage('Yalnızca aynı tür ve aynı aşamadaki parçalar birleşir.');
+  }
+
+  function measureBoard() {
+    boardRef.current?.measureInWindow((x, y, width, height) => { boardFrameRef.current = { x, y, width, height }; });
+  }
+
+  function handleTileLayout(tileId: string, frame: TileFrame) {
+    tileFramesRef.current.set(tileId, frame);
+  }
+
+  function handleTileDrop(tileId: string, absoluteX: number, absoluteY: number) {
+    const boardFrame = boardFrameRef.current;
+    if (!boardFrame) return;
+    const x = absoluteX - boardFrame.x;
+    const y = absoluteY - boardFrame.y;
+    const targetId = board.find(tile => {
+      if (!tile || tile.id === tileId) return false;
+      const frame = tileFramesRef.current.get(tile.id);
+      return frame && x >= frame.x && x <= frame.x + frame.width && y >= frame.y && y <= frame.y + frame.height;
+    })?.id;
+    if (!targetId) { setBoardMessage('Birleştirmek için parçayı eşinin üzerine bırak.'); return; }
+    if (!animateMerge(tileId, targetId)) {
+      setSelectedTileId(targetId);
+      setBoardMessage('Yalnızca aynı tür ve aynı aşamadaki parçalar birleşir.');
+    }
   }
 
   function deliverSelectedTile() {
@@ -197,6 +238,16 @@ export function GameScreen({ mode, overlay, overlayOpenId, onOpenBoard, hasBotto
     setStoryMapVisible(true);
   }
 
+  function closeAccountSheet() {
+    setAccountVisible(false);
+    onDismissOverlay?.();
+  }
+
+  function closeStoryMapSheet() {
+    setStoryMapVisible(false);
+    onDismissOverlay?.();
+  }
+
   return <View style={styles.root}>
     {mode === 'island' ? <ImageBackground source={islandImage} style={styles.islandScreen} imageStyle={styles.islandBackground}>
       <View style={styles.darkVeil} />
@@ -206,27 +257,50 @@ export function GameScreen({ mode, overlay, overlayOpenId, onOpenBoard, hasBotto
       <TopBar topInset={insets.top} energy={energy} maxEnergy={maxEnergy} coins={coins} gems={gems} />
       <CopilotStep name="mission" order={1} text="Her onarım bir görevle başlar. Üstteki başlık aktif hedefini, Mira’nın notu ise sıradaki hamleni gösterir."><CopilotView style={styles.boardIntro}><View style={styles.boardPortrait}><Image source={miraQuestImage} style={styles.boardPortraitImage} resizeMode="contain" /></View><View style={styles.boardDialogueBubble}><View style={styles.boardBubbleTail} /><View style={styles.boardMissionCopy}><Text style={styles.boardMissionEyebrow}>{isEndlessMode ? 'KIYI SÖZLEŞMELERİ' : activeChapter.location.toUpperCase()}</Text><Text numberOfLines={1} style={styles.boardSpeechTitle}>{isEndlessMode ? activeTask?.title : chapterComplete ? 'Bölüm tamamlandı' : activeTask?.title}</Text></View><Text numberOfLines={1} style={styles.boardMissionHint}>{isEndlessMode ? `${endlessProjectCount + 1}. sözleşme` : chapterComplete ? 'Yeni kıyı yakında' : boardMessage}</Text></View></CopilotView></CopilotStep>
       {activeTask ? <CopilotStep name="requirements" order={2} text="Görevin için gereken proje parçalarını burada takip et. Her parça tamamlandığında sayaç ilerler."><CopilotView style={styles.boardTaskCard}><BoardRequirements task={activeTask} inventory={inventory} /></CopilotView></CopilotStep> : <View style={styles.chapterCompleteCard}><View><Text style={styles.boardTaskLabel}>{nextChapter ? 'KIYI YENİLENDİ' : 'TÜM KIYILAR YENİLENDİ'}</Text><Text style={styles.chapterCompleteTitle}>{nextChapter ? `${nextChapter.location} seni bekliyor` : 'Harika iş çıkardın, deniz yeniden ışıldıyor.'}</Text></View><Pressable accessibilityLabel={nextChapter ? 'Yeni bölüme başla' : 'Hikâye haritasını aç'} onPress={advanceFromCompletedChapter} style={styles.boardCompleteButton}><Text style={styles.boardCompleteButtonText}>{nextChapter ? 'Başla' : 'Harita'}</Text></Pressable></View>}
-      <CopilotStep name="merge-board" order={3} text="Aynı tür ve seviyedeki iki parçaya sırayla dokun. Yeterince birleştirdiğinde teslim edebileceğin bir eşya oluşur."><CopilotView style={styles.gameBoard}>{Array.from({ length: 30 }, (_, index) => { const tile = board[index]; return tile ? <MergeTileButton key={tile.id} tile={tile} selected={tile.id === selectedTileId} onPress={() => selectTile(tile.id)} /> : <Pressable key={`empty-${index}`} accessibilityRole="button" accessibilityLabel={`Boş tahta hücresi ${index + 1}`} onPress={() => selectEmptyCell(index)} style={styles.emptyCell} />; })}{showBurst ? <><Animated.View pointerEvents="none" style={[styles.mergeFlash, { opacity: mergeFlash }]} /><Animated.Text pointerEvents="none" style={[styles.sparkle, styles.sparkleOne, { opacity: sparkle, transform: [{ translateY: sparkle.interpolate({ inputRange: [0, 1], outputRange: [4, -18] }) }, { scale: sparkle.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.2] }) }] }]}>✦</Animated.Text><Animated.Text pointerEvents="none" style={[styles.sparkle, styles.sparkleTwo, { opacity: sparkle, transform: [{ translateY: sparkle.interpolate({ inputRange: [0, 1], outputRange: [3, -24] }) }, { scale: sparkle.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }] }]}>✦</Animated.Text><Animated.Text pointerEvents="none" style={[styles.sparkle, styles.sparkleThree, { opacity: sparkle, transform: [{ translateY: sparkle.interpolate({ inputRange: [0, 1], outputRange: [2, -14] }) }, { scale: sparkle.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.1] }) }] }]}>✦</Animated.Text><Animated.View pointerEvents="none" style={[styles.burst, { transform: [{ scale: burst }] }]}><Text style={styles.burstText}>✨ Birleşim! ✨</Text></Animated.View></> : null}</CopilotView></CopilotStep>
-      <View style={styles.boardFooter}><View style={styles.energyStatus}><View style={[styles.energyStatusIcon, energy >= maxEnergy && styles.energyStatusIconFull]}><Text style={styles.energyStatusBolt}>⚡</Text></View><Text style={styles.energyStatusText}>{energy >= maxEnergy ? 'Enerji dolu' : nextEnergy}</Text><Text style={styles.energyStatusValue}>{energy}/{maxEnergy}</Text></View><View style={styles.recipeBar}><View style={styles.recipeSlot}><Image source={itemImages[nextGeneratedResource]} style={styles.nextResourceImage} /></View><Text style={styles.recipeText}>{selectedTile?.level === 3 ? projectPartNames[selectedTile.kind] + ' hazır' : selectedTileId ? 'Eş seviyeyi bul' : `Sıradaki: ${resourceNames[nextGeneratedResource]}`}</Text>{selectedTile?.level === 3 ? <Pressable accessibilityLabel="Proje parçasını göreve yerleştir" onPress={deliverSelectedTile} style={styles.deliverAction}><Text style={styles.deliverActionText}>Göreve teslim et</Text></Pressable> : null}<CopilotStep name="generate" order={4} text="+ düğmesi sıradaki parçayı üretir ve 1 enerji harcar. Proje aşamasına ulaşınca Teslim düğmesi görünür; parçayı göreve yerleştirip ödülünü alabilirsin."><CopilotPressable accessibilityLabel="Sıradaki parçayı üret" disabled={energy < 1 || occupiedTileCount >= 30} onPress={store.generateTile} style={[styles.recipeAction, (energy < 1 || occupiedTileCount >= 30) && styles.disabled]}><Text style={styles.recipeActionText}>Üret +</Text></CopilotPressable></CopilotStep></View></View>
+      <CopilotStep name="merge-board" order={3} text="Aynı tür ve seviyedeki iki parçaya sırayla dokun veya birini eşinin üstüne sürükle. Yeterince birleştirdiğinde teslim edebileceğin bir eşya oluşur."><CopilotView ref={boardRef} onLayout={() => { setBoardTutorialReady(true); requestAnimationFrame(measureBoard); }} style={styles.gameBoard}>{Array.from({ length: 30 }, (_, index) => { const tile = board[index]; return tile ? <MergeTileButton key={tile.id} tile={tile} selected={tile.id === selectedTileId} onDrop={handleTileDrop} onLayout={handleTileLayout} onPress={() => selectTile(tile.id)} /> : <Pressable key={`empty-${index}`} accessibilityRole="button" accessibilityLabel={`Boş tahta hücresi ${index + 1}`} onPress={() => selectEmptyCell(index)} style={styles.emptyCell} />; })}{showBurst ? <><Animated.View pointerEvents="none" style={[styles.mergeFlash, { opacity: mergeFlash }]} /><Animated.Text pointerEvents="none" style={[styles.sparkle, styles.sparkleOne, { opacity: sparkle, transform: [{ translateY: sparkle.interpolate({ inputRange: [0, 1], outputRange: [4, -18] }) }, { scale: sparkle.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.2] }) }] }]}>✦</Animated.Text><Animated.Text pointerEvents="none" style={[styles.sparkle, styles.sparkleTwo, { opacity: sparkle, transform: [{ translateY: sparkle.interpolate({ inputRange: [0, 1], outputRange: [3, -24] }) }, { scale: sparkle.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }] }]}>✦</Animated.Text><Animated.Text pointerEvents="none" style={[styles.sparkle, styles.sparkleThree, { opacity: sparkle, transform: [{ translateY: sparkle.interpolate({ inputRange: [0, 1], outputRange: [2, -14] }) }, { scale: sparkle.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.1] }) }] }]}>✦</Animated.Text><Animated.View pointerEvents="none" style={[styles.burst, { transform: [{ scale: burst }] }]}><Text style={styles.burstText}>✨ Birleşim! ✨</Text></Animated.View></> : null}</CopilotView></CopilotStep>
+      <View style={styles.boardFooter}><View style={styles.energyStatus}><View style={[styles.energyStatusIcon, energy >= maxEnergy && styles.energyStatusIconFull]}><Text style={styles.energyStatusBolt}>⚡</Text></View><Text style={styles.energyStatusText}>{energy >= maxEnergy ? 'Enerji dolu' : nextEnergy}</Text><Text style={styles.energyStatusValue}>{energy}/{maxEnergy}</Text></View><View style={styles.recipeBar}><View style={styles.recipeSlot}><Image source={itemImages[nextGeneratedResource]} style={styles.nextResourceImage} /></View><Text style={styles.recipeText}>{selectedTile?.level === 3 ? projectPartNames[selectedTile.kind] + ' hazır' : selectedTileId ? 'Eş seviyeyi bul' : `Sıradaki: ${resourceNames[nextGeneratedResource]}`}</Text>{selectedTile?.level === 3 ? <Pressable accessibilityLabel="Proje parçasını göreve yerleştir" onPress={deliverSelectedTile} style={styles.deliverAction}><Text style={styles.deliverActionText}>Göreve teslim et</Text></Pressable> : null}<CopilotStep name="generate" order={4} text="Üret düğmesi, yeterli enerjin varsa boş kareleri tek dokunuşta doldurur; her parça 1 enerji harcar. Proje aşamasına ulaşınca Teslim düğmesi görünür; parçayı göreve yerleştirip ödülünü alabilirsin."><CopilotPressable accessibilityLabel="Boş kareleri üret" disabled={energy < 1 || occupiedTileCount >= 30} onPress={store.generateTiles} style={[styles.recipeAction, (energy < 1 || occupiedTileCount >= 30) && styles.disabled]}><Text style={styles.recipeActionText}>Üret +</Text></CopilotPressable></CopilotStep></View></View>
     </View>}
-    <AccountSheet visible={accountVisible} onClose={() => setAccountVisible(false)} onStartTutorial={() => { setAccountVisible(false); store.beginGameTutorial(); if (onOpenBoard) onOpenBoard(); else navigation.navigate('Board'); }} />
-    <StoryMapSheet visible={storyMapVisible} chapters={storyChapters} activeChapterId={activeChapter.id} unlockedChapterIds={storyProgress.unlockedChapterIds} completedTaskIds={storyProgress.completedTaskIds} inventory={inventory} onChoose={store.selectChapter} onClose={() => setStoryMapVisible(false)} />
-    <TaskRewardModal task={rewardTask} location={activeChapter.location} scene={islandImage} onClose={() => setRewardTask(null)} />
+    <AccountSheet visible={accountVisible} onClose={closeAccountSheet} onStartTutorial={() => { setAccountVisible(false); store.beginGameTutorial(); if (onOpenBoard) onOpenBoard(); else navigation.navigate('Board'); }} />
+    <StoryMapSheet visible={storyMapVisible} chapters={storyChapters} activeChapterId={activeChapter.id} unlockedChapterIds={storyProgress.unlockedChapterIds} completedTaskIds={storyProgress.completedTaskIds} inventory={inventory} onChoose={store.selectChapter} onClose={closeStoryMapSheet} />
+    <TaskRewardModal task={rewardTask} location={activeChapter.location} scene={islandImage} chapterReward={rewardTask && activeChapter.tasks.at(-1)?.id === rewardTask.id ? getChapterCompletionReward(activeChapter.id) : null} onClose={() => setRewardTask(null)} />
     <Modal transparent visible={playerHydrated && mode === 'island' && isFocused && tutorialPhase === 'welcome'} animationType="fade" onRequestClose={store.dismissIntro}><View style={styles.tutorialFallbackBackdrop}><View style={styles.tutorialFallbackCard}><Text style={styles.tutorialFallbackEyebrow}>MİRA’NIN REHBERİ</Text><Text style={styles.tutorialFallbackTitle}>Kıyıyı birlikte onaralım</Text><Text style={styles.tutorialFallbackBody}>Önce oyun tahtasına geçelim. Sonraki adımlarda Copilot görevini, ihtiyaçlarını ve birleşim hareketini sırayla gösterecek.</Text><Pressable accessibilityRole="button" onPress={() => { store.beginGameTutorial(); if (onOpenBoard) onOpenBoard(); else navigation.navigate('Board'); }} style={styles.tutorialFallbackButton}><Text style={styles.tutorialFallbackButtonText}>Tahtaya geç</Text></Pressable></View></View></Modal>
   </View>;
 }
 
 function TopBar({ energy, maxEnergy, coins, gems, topInset }: { energy: number; maxEnergy: number; coins: number; gems: number; topInset: number }) { const buyEnergyWithCoins = useGameStore(state => state.buyEnergyWithCoins); const buyEnergyWithGems = useGameStore(state => state.buyEnergyWithGems); const [offer, setOffer] = useState<'coins' | 'gems' | null>(null); const [offerMessage, setOfferMessage] = useState(''); const closeOffer = () => { setOffer(null); setOfferMessage(''); }; const isCoinOffer = offer === 'coins'; const hasEnough = isCoinOffer ? coins >= 100 : gems >= 1; const canBuy = energy < maxEnergy && hasEnough; const confirmOffer = () => { const purchased = isCoinOffer ? buyEnergyWithCoins() : buyEnergyWithGems(); if (purchased) closeOffer(); else setOfferMessage(energy >= maxEnergy ? 'Enerjin zaten dolu.' : `Yeterli ${isCoinOffer ? 'altının' : 'elmasın'} yok.`); }; return <><View style={[styles.topBar, { height: topInset + 94, paddingTop: topInset + 2 }]}><Image source={logoImage} style={[styles.logoImage, { top: topInset - 5 }]} resizeMode="contain" /><View style={[styles.currencies, { top: topInset + 12 }]}><Pill icon="⚡" tone="energy" value={`${energy}`} /><Pill icon="●" tone="coin" value={coins.toLocaleString('tr-TR')} onPress={() => setOffer('coins')} /><Pill icon="◆" tone="gem" value={gems} onPress={() => setOffer('gems')} /></View></View><Modal transparent visible={offer !== null} animationType="fade" onRequestClose={closeOffer}><View style={styles.offerBackdrop}><Pressable accessibilityLabel="Satın alma penceresini kapat" onPress={closeOffer} style={styles.offerDismissArea} /><View style={styles.offerCard}><Pressable accessibilityLabel="Kapat" onPress={closeOffer} style={styles.offerClose}><Text style={styles.offerCloseText}>×</Text></Pressable><Text style={styles.offerEyebrow}>ENERJİ DEPOSU</Text><Text style={styles.offerTitle}>Enerjin azaldı mı?</Text><Text style={styles.offerBody}>Mevcut enerji: {energy}/{maxEnergy}</Text><View style={styles.offerExchange}><View style={styles.offerResource}><Image source={isCoinOffer ? hudCoinImage : hudGemImage} style={styles.offerResourceImage} /><Text style={styles.offerResourceValue}>{isCoinOffer ? '100' : '1'}</Text><Text style={styles.offerResourceLabel}>{isCoinOffer ? 'altın' : 'elmas'}</Text></View><Text style={styles.offerArrow}>→</Text><View style={styles.offerEnergy}><Text style={styles.offerEnergyIcon}>⚡</Text><Text style={styles.offerEnergyValue}>{isCoinOffer ? '+5' : '+10'}</Text><Text style={styles.offerResourceLabel}>enerji</Text></View></View>{offerMessage ? <Text style={styles.offerMessage}>{offerMessage}</Text> : null}<Pressable accessibilityRole="button" accessibilityLabel="Enerji satın al" disabled={!canBuy} onPress={confirmOffer} style={[styles.offerConfirm, !canBuy && styles.offerConfirmDisabled]}><Text style={styles.offerConfirmText}>{energy >= maxEnergy ? 'Enerji dolu' : hasEnough ? 'Değiş tokuş yap' : 'Bakiye yetersiz'}</Text></Pressable><Pressable accessibilityRole="button" onPress={closeOffer} style={styles.offerCancel}><Text style={styles.offerCancelText}>Şimdilik vazgeç</Text></Pressable></View></View></Modal></>; }
-function Pill({ icon, value, tone, onPress }: { icon: string; value: string | number; tone: 'energy' | 'coin' | 'gem'; onPress?: () => void }) { const toneStyle = tone === 'energy' ? styles.energyIcon : tone === 'coin' ? styles.coinIcon : styles.gemIcon; const iconNode = tone === 'coin' ? <Image source={hudCoinImage} style={styles.currencyImage} /> : tone === 'gem' ? <Image source={hudGemImage} style={styles.currencyImage} /> : <Text style={[styles.pillIcon, toneStyle]}>{icon}</Text>; return <Pressable accessibilityRole="button" accessibilityLabel={tone === 'coin' ? 'Altınla enerji al' : tone === 'gem' ? 'Elmasla enerji al' : 'Enerji'} onPress={onPress} disabled={!onPress} style={[styles.pill, tone === 'energy' && styles.energyPill, tone === 'coin' && styles.coinPill, tone === 'gem' && styles.gemPill]}>{iconNode}<Text style={styles.pillText}>{value}</Text>{tone !== 'energy' ? <Text style={styles.pillPlus}>+</Text> : null}</Pressable>; }
+function Pill({ icon, value, tone, onPress }: { icon: string; value: string | number; tone: 'energy' | 'coin' | 'gem'; onPress?: () => void }) {
+  const canClaimRewardedGem = useGameStore(state => state.canClaimRewardedGem);
+  const claimRewardedGem = useGameStore(state => state.claimRewardedGem);
+  const toneStyle = tone === 'energy' ? styles.energyIcon : tone === 'coin' ? styles.coinIcon : styles.gemIcon;
+  const iconNode = tone === 'coin' ? <Image source={hudCoinImage} style={styles.currencyImage} /> : tone === 'gem' ? <Image source={hudGemImage} style={styles.currencyImage} /> : <Text style={[styles.pillIcon, toneStyle]}>{icon}</Text>;
+  const handlePress = async () => {
+    if (tone !== 'gem' || Number(value) > 0) { onPress?.(); return; }
+    if (!canClaimRewardedGem()) { Alert.alert('Reklam ödülü hazır değil', 'Günlük hakkın bitmiş olabilir ya da bekleme süresi devam ediyor.'); return; }
+    const result = await showRewardedEnergyAd();
+    if (result === 'completed' && claimRewardedGem()) { Alert.alert('Elmas kazandın!', '+1 elmas hesabına eklendi.'); return; }
+    Alert.alert('Reklam hazır değil', result === 'unavailable' ? 'Şu an gösterilecek reklam yok. Biraz sonra yeniden dene.' : 'Reklam tamamlanmadığı için ödül eklenmedi.');
+  };
+  return <Pressable accessibilityRole="button" accessibilityLabel={tone === 'coin' ? 'Altınla enerji al' : tone === 'gem' ? 'Elmas al' : 'Enerji'} onPress={handlePress} disabled={!onPress && tone !== 'gem'} style={[styles.pill, tone === 'energy' && styles.energyPill, tone === 'coin' && styles.coinPill, tone === 'gem' && styles.gemPill]}>{iconNode}<Text style={styles.pillText}>{value}</Text>{tone !== 'energy' ? <Text style={styles.pillPlus}>+</Text> : null}</Pressable>;
+}
 function RequirementLine({ task, inventory }: { task: StoryTask; inventory: Record<ResourceKind, number> }) { return <View style={styles.requirements}>{resources.map(kind => task.requirements[kind] ? <View key={kind} style={styles.requirement}><Image source={itemImages[kind]} style={styles.requirementIcon} /><Text style={styles.requirementText}>{inventory[kind]}/{task.requirements[kind]}</Text></View> : null)}</View>; }
 const projectPartNames: Record<ResourceKind, string> = { driftwood: 'Kiriş', seaGlass: 'Mercek', shell: 'Mühür' };
 function BoardRequirements({ task, inventory }: { task: StoryTask; inventory: Record<ResourceKind, number> }) { return <View style={styles.boardRequirements}>{resources.map(kind => task.requirements[kind] ? <View key={kind} style={[styles.boardRequirement, inventory[kind] >= (task.requirements[kind] ?? 0) && styles.boardRequirementReady]}><Image source={itemImages[kind]} style={styles.boardRequirementIcon} /><View><Text numberOfLines={1} style={styles.boardRequirementName}>{projectPartNames[kind]}</Text><Text style={styles.boardRequirementText}>{inventory[kind]}/{task.requirements[kind]} {inventory[kind] >= (task.requirements[kind] ?? 0) ? '✓' : ''}</Text></View></View> : null)}</View>; }
-function MergeTileButton({ tile, selected, onPress }: { tile: MergeTile; selected: boolean; onPress: () => void }) { const scale = useRef(new Animated.Value(1)).current; useEffect(() => { Animated.spring(scale, { toValue: selected ? 1.08 : 1, friction: 5, useNativeDriver: true }).start(); }, [scale, selected]); return <Animated.View style={[styles.tile, tile.level === 2 && styles.refinedTile, tile.level === 3 && styles.projectTile, selected && styles.selectedTile, { transform: [{ scale }] }]}><Pressable accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`${resourceNames[tile.kind]}, seviye ${tile.level}`} onPress={onPress} onPressIn={() => Animated.spring(scale, { toValue: 0.93, friction: 7, useNativeDriver: true }).start()} onPressOut={() => Animated.spring(scale, { toValue: selected ? 1.08 : 1, friction: 7, useNativeDriver: true }).start()} style={styles.tilePress}><Image source={itemImages[tile.kind]} style={styles.tileImage} resizeMode="contain" /><View pointerEvents="none" style={[styles.levelBadge, tile.level === 3 && styles.levelBadgeMax]}><Text style={styles.levelBadgeText}>●</Text></View></Pressable></Animated.View>; }
+function MergeTileButton({ tile, selected, onDrop, onLayout, onPress }: { tile: MergeTile; selected: boolean; onDrop: (tileId: string, absoluteX: number, absoluteY: number) => void; onLayout: (tileId: string, frame: TileFrame) => void; onPress: () => void }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const dragX = useRef(new Animated.Value(0)).current;
+  const dragY = useRef(new Animated.Value(0)).current;
+  const dragGesture = useMemo(() => Gesture.Pan().minDistance(10).onUpdate(event => { dragX.setValue(event.translationX); dragY.setValue(event.translationY); }).onEnd(event => onDrop(tile.id, event.absoluteX, event.absoluteY)).onFinalize(() => Animated.parallel([Animated.spring(dragX, { toValue: 0, useNativeDriver: true }), Animated.spring(dragY, { toValue: 0, useNativeDriver: true })]).start()), [dragX, dragY, onDrop, tile.id]);
+  useEffect(() => { Animated.spring(scale, { toValue: selected ? 1.08 : 1, friction: 5, useNativeDriver: true }).start(); }, [scale, selected]);
+  const mossy = activeMossyTileIds.has(tile.id);
+  return <GestureDetector gesture={dragGesture}><Animated.View onLayout={event => onLayout(tile.id, event.nativeEvent.layout)} style={[styles.tile, tile.level === 2 && styles.refinedTile, tile.level === 3 && styles.projectTile, selected && styles.selectedTile, { transform: [{ translateX: dragX }, { translateY: dragY }, { scale }] }]}><Pressable accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`${resourceNames[tile.kind]}, seviye ${tile.level}${mossy ? ', yosunlu hücre' : ''}`} onPress={onPress} onPressIn={() => Animated.spring(scale, { toValue: 0.93, friction: 7, useNativeDriver: true }).start()} onPressOut={() => Animated.spring(scale, { toValue: selected ? 1.08 : 1, friction: 7, useNativeDriver: true }).start()} style={styles.tilePress}><Image source={itemImages[tile.kind]} style={styles.tileImage} resizeMode="contain" />{mossy ? <View pointerEvents="none" style={styles.mossOverlay}><Text style={styles.mossText}>✦</Text></View> : null}<View pointerEvents="none" style={[styles.levelBadge, tile.level === 3 && styles.levelBadgeMax]}><Text style={styles.levelBadgeText}>●</Text></View></Pressable></Animated.View></GestureDetector>;
+}
 
 const effectStyles = {
   mergeFlash: { position: 'absolute' as const, left: 3, right: 3, top: 3, bottom: 3, borderRadius: 18, backgroundColor: '#FFF3B0', borderWidth: 3, borderColor: '#FFF9D6' },
   sparkle: { position: 'absolute' as const, color: '#FFF5A8', fontSize: 28, fontWeight: '900' as const, textShadowColor: '#B76D20', textShadowRadius: 4 },
   sparkleOne: { left: '37%' as const, top: '34%' as const }, sparkleTwo: { left: '55%' as const, top: '37%' as const, fontSize: 21 }, sparkleThree: { left: '48%' as const, top: '50%' as const, fontSize: 18 },
+  mossOverlay: { position: 'absolute' as const, left: 2, right: 2, top: 2, bottom: 2, alignItems: 'center' as const, justifyContent: 'center' as const, borderRadius: 7, backgroundColor: 'rgba(48, 125, 55, 0.72)', borderWidth: 2, borderColor: '#9DDA72' },
+  mossText: { color: '#E7FFB1', fontSize: 22, fontWeight: '900' as const, textShadowColor: '#225D2A', textShadowRadius: 3 },
 };
 const styles = StyleSheet.create({
   ...effectStyles,

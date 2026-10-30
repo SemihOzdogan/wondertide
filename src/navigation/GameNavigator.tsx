@@ -48,11 +48,11 @@ function IslandTabScreen() {
 }
 function TasksTabScreen({ route }: BottomTabScreenProps<MainTabParamList, 'Tasks'>) {
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
-  return <GameScreen mode="island" overlay="tasks" overlayOpenId={route.params?.openId} onOpenBoard={() => navigation.navigate('Shop')} />;
+  return <GameScreen mode="island" overlay="tasks" overlayOpenId={route.params?.openId} onOpenBoard={() => navigation.navigate('Shop')} onDismissOverlay={() => navigation.navigate('Island')} />;
 }
 function BagTabScreen({ route }: BottomTabScreenProps<MainTabParamList, 'Bag'>) {
   const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
-  return <GameScreen mode="island" overlay="account" overlayOpenId={route.params?.openId} onOpenBoard={() => navigation.navigate('Shop')} />;
+  return <GameScreen mode="island" overlay="account" overlayOpenId={route.params?.openId} onOpenBoard={() => navigation.navigate('Shop')} onDismissOverlay={() => navigation.navigate('Island')} />;
 }
 function ShopTabScreen() { return <GameScreen mode="board" hasBottomTab />; }
 function BoardScreen() { return <GameScreen mode="board" />; }

@@ -2,10 +2,11 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, ImageBackground, Modal, Pressable, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 
 import type { StoryTask } from '../../domain/game';
+import type { ChapterCompletionReward } from '../../store/gameStore';
 
-type Props = { task: StoryTask | null; location: string; scene: ImageSourcePropType; onClose: () => void };
+type Props = { task: StoryTask | null; location: string; scene: ImageSourcePropType; chapterReward: ChapterCompletionReward | null; onClose: () => void };
 
-export function TaskRewardModal({ task, location, scene, onClose }: Props) {
+export function TaskRewardModal({ task, location, scene, chapterReward, onClose }: Props) {
   const stars = useRef(new Animated.Value(0)).current;
   const chest = useRef(new Animated.Value(0.88)).current;
 
@@ -23,8 +24,8 @@ export function TaskRewardModal({ task, location, scene, onClose }: Props) {
   return <Modal visible animationType="fade" onRequestClose={onClose}>
     <ImageBackground source={scene} style={styles.scene} imageStyle={styles.sceneImage}>
       <View style={styles.titleArea}>
-        <Text style={styles.kicker}>{location.toUpperCase()} · GÖREV TAMAMLANDI</Text>
-        <Text numberOfLines={2} adjustsFontSizeToFit style={styles.title}>{task.title}</Text>
+        <Text style={styles.kicker}>{location.toUpperCase()} · {chapterReward ? 'BÖLÜM TAMAMLANDI' : 'GÖREV TAMAMLANDI'}</Text>
+        <Text numberOfLines={2} adjustsFontSizeToFit style={styles.title}>{chapterReward ? `${location} yenilendi!` : task.title}</Text>
         <Animated.View style={[styles.stars, { opacity: stars, transform: [{ scale: stars }] }]}>
           <Text style={styles.star}>★</Text><Text style={styles.star}>★</Text><Text style={styles.star}>★</Text>
         </Animated.View>
@@ -32,11 +33,13 @@ export function TaskRewardModal({ task, location, scene, onClose }: Props) {
       <Animated.View style={[styles.rewardArea, { transform: [{ scale: chest }] }]}>
         <Text style={styles.rewardLabel}>Ödüller</Text>
         <View style={styles.rewardCard}>
-          <Reward icon="●" iconStyle={styles.coinIcon} value={`+${task.reward.coins}`} label="Altın" />
-          {task.reward.gems ? <Reward icon="◆" iconStyle={styles.gemIcon} value={`+${task.reward.gems}`} label="Mücevher" /> : null}
+          <Reward icon="●" iconStyle={styles.coinIcon} value={`+${task.reward.coins + (chapterReward?.coins ?? 0)}`} label="Altın" />
+          {(task.reward.gems || chapterReward?.gems) ? <Reward icon="◆" iconStyle={styles.gemIcon} value={`+${(task.reward.gems ?? 0) + (chapterReward?.gems ?? 0)}`} label="Elmas" /> : null}
+          {chapterReward ? <Reward icon="⚡" iconStyle={styles.energyIcon} value={`+${chapterReward.energy}`} label="Enerji" /> : null}
+          {chapterReward ? <Reward icon="✦" iconStyle={styles.decorationIcon} value="Yeni" label={chapterReward.decoration} /> : null}
         </View>
         <Pressable accessibilityLabel="Ödülleri al" onPress={onClose} style={styles.button}>
-          <Text style={styles.buttonText}>Harika!</Text>
+          <Text style={styles.buttonText}>{chapterReward ? 'Kıyıyı keşfet' : 'Harika!'}</Text>
         </Pressable>
       </Animated.View>
     </ImageBackground>
@@ -57,7 +60,7 @@ const styles = StyleSheet.create({
   rewardArea: { alignItems: 'center', paddingHorizontal: 21, paddingBottom: 29 },
   rewardLabel: { color: '#6A4829', backgroundColor: '#FFF0C7', borderRadius: 14, paddingHorizontal: 23, paddingVertical: 6, fontWeight: '900', fontSize: 13, zIndex: 1, marginBottom: -8, borderWidth: 2, borderColor: '#E4B76D' },
   rewardCard: { alignSelf: 'stretch', flexDirection: 'row', justifyContent: 'space-around', backgroundColor: '#FFF4DA', borderRadius: 20, paddingTop: 21, paddingBottom: 15, borderWidth: 3, borderColor: '#FCE6B7', shadowColor: '#4A2C17', shadowOpacity: 0.35, shadowRadius: 8, elevation: 8 },
-  reward: { alignItems: 'center', minWidth: 73 }, rewardIcon: { fontSize: 35, lineHeight: 38, fontWeight: '900' }, coinIcon: { color: '#F9B923', textShadowColor: '#A96A0D', textShadowRadius: 2 }, gemIcon: { color: '#A65DE4', textShadowColor: '#57298F', textShadowRadius: 2 },
+  reward: { alignItems: 'center', minWidth: 63, flex: 1 }, rewardIcon: { fontSize: 35, lineHeight: 38, fontWeight: '900' }, coinIcon: { color: '#F9B923', textShadowColor: '#A96A0D', textShadowRadius: 2 }, gemIcon: { color: '#A65DE4', textShadowColor: '#57298F', textShadowRadius: 2 }, energyIcon: { color: '#E8A720', textShadowColor: '#8F5714', textShadowRadius: 2 }, decorationIcon: { color: '#2B9FB7', textShadowColor: '#175A72', textShadowRadius: 2 },
   rewardValue: { color: '#6B4422', fontSize: 16, fontWeight: '900', marginTop: 1 }, rewardName: { color: '#9C7857', fontSize: 10, fontWeight: '800', marginTop: 1 },
   button: { alignSelf: 'stretch', alignItems: 'center', marginTop: 13, paddingVertical: 14, backgroundColor: '#53B939', borderRadius: 15, borderWidth: 3, borderColor: '#C9F08B', shadowColor: '#245D21', shadowOpacity: 0.55, shadowOffset: { width: 0, height: 4 }, shadowRadius: 2, elevation: 8 }, buttonText: { color: '#FFF', fontSize: 21, fontWeight: '900', textShadowColor: '#287724', textShadowRadius: 2 },
 });

@@ -13,25 +13,31 @@ const initialBoard: Array<MergeTile | null> = Array.from({ length: 30 }, (_, ind
 }));
 
 const initialPlayerState: PlayerState = {
-  energy: 86, maxEnergy: 100, lastEnergyRefreshAt: new Date().toISOString(), coins: 1230, gems: 45, dailyStreak: 0, lastDailyRewardAt: null,
+  energy: 86, maxEnergy: 100, lastEnergyRefreshAt: new Date().toISOString(), coins: 50, gems: 0, dailyStreak: 0, lastDailyRewardAt: null,
   inventory: { driftwood: 0, seaGlass: 0, shell: 0 },
   board: initialBoard,
   storyProgress: { chapterId: 'lighthouse-tales', unlockedChapterIds: ['lighthouse-tales'], completedTaskIds: [], restoredAreaIds: [] },
-  mergeCount: 0, generatedTileCount: 0, generationQueue: ['driftwood', 'seaGlass', 'shell', 'driftwood', 'seaGlass', 'shell'], endlessProjectCount: 0, hasSeenIntro: false, tutorialPhase: 'welcome', tutorialVersion: 5, lastSavedAt: new Date().toISOString(),
+  mergeCount: 0, generatedTileCount: 0, generationQueue: ['driftwood', 'seaGlass', 'shell', 'driftwood', 'seaGlass', 'shell'], mossyCellIndices: [4, 13, 25], rewardedAdWatchCount: 0, lastRewardedAdAt: null, endlessProjectCount: 0, hasSeenIntro: false, tutorialPhase: 'welcome', tutorialVersion: 5, lastSavedAt: new Date().toISOString(),
 };
 
 type GameStore = PlayerState & {
   generateTile: () => void;
+  generateTiles: () => number;
   spendCoins: (amount: number) => boolean;
   spendGems: (amount: number) => boolean;
   buyEnergyWithCoins: () => boolean;
   buyEnergyWithGems: () => boolean;
   mergeTiles: (firstTileId: string, secondTileId: string) => boolean;
+  clearMossAt: (index: number) => void;
   deliverProjectTile: (tileId: string) => boolean;
   moveTile: (tileId: string, targetIndex: number) => boolean;
   refreshEnergy: () => void;
   canClaimDailyReward: () => boolean;
   claimDailyReward: () => { coins: number; gems: number; energy: number } | null;
+  canClaimRewardedEnergy: () => boolean;
+  canClaimRewardedGem: () => boolean;
+  claimRewardedEnergy: () => boolean;
+  claimRewardedGem: () => boolean;
   selectChapter: (chapterId: string) => void;
   unlockChapter: (chapterId: string) => void;
   canComplete: (task: StoryTask) => boolean;
@@ -46,6 +52,23 @@ const resourceOrder: ResourceKind[] = ['driftwood', 'seaGlass', 'shell'];
 const energyIntervalMs = 5 * 60 * 1000;
 const boardCapacity = 30;
 const maximumTileLevel = projectTileLevel;
+const rewardedEnergyAmount = 5;
+const rewardedAdDailyLimit = 5;
+// Test ederken reklam/ödül akışını art arda doğrulayabilmek için debug sürümünde bekleme yoktur.
+const rewardedAdCooldownMs = __DEV__ ? 0 : 10 * 60 * 1000;
+
+export type ChapterCompletionReward = { coins: number; gems: number; energy: number; decoration: string };
+
+export function getChapterCompletionReward(chapterId: string): ChapterCompletionReward | null {
+  const index = storyChapters.findIndex(chapter => chapter.id === chapterId);
+  if (index < 0) return null;
+  return {
+    coins: 150 + index * 10,
+    gems: (index + 1) % 3 === 0 ? 1 : 0,
+    energy: 10,
+    decoration: `${storyChapters[index].location} hatırası`,
+  };
+}
 
 export function getEndlessProject(completedCount: number): StoryTask {
   const tier = Math.floor(completedCount / 3) + 1;
@@ -124,7 +147,10 @@ function normalizePlayer(player: Partial<PlayerState>): PlayerState {
     : initialPlayerState.storyProgress.chapterId;
   const isCurrentTutorial = player.tutorialVersion === initialPlayerState.tutorialVersion;
   const tutorialPhase = isCurrentTutorial ? player.tutorialPhase ?? (merged.hasSeenIntro ? 'complete' : 'welcome') : 'welcome';
-  return { ...merged, hasSeenIntro: isCurrentTutorial ? merged.hasSeenIntro : false, tutorialPhase, tutorialVersion: initialPlayerState.tutorialVersion, board, generationQueue: generationQueue.length ? generationQueue : createGenerationBatch(merged.generatedTileCount), energy, lastEnergyRefreshAt,
+  const mossyCellIndices = Array.isArray(merged.mossyCellIndices)
+    ? [...new Set(merged.mossyCellIndices.filter(index => Number.isInteger(index) && index >= 0 && index < boardCapacity))]
+    : initialPlayerState.mossyCellIndices;
+  return { ...merged, hasSeenIntro: isCurrentTutorial ? merged.hasSeenIntro : false, tutorialPhase, tutorialVersion: initialPlayerState.tutorialVersion, board, generationQueue: generationQueue.length ? generationQueue : createGenerationBatch(merged.generatedTileCount), mossyCellIndices, energy, lastEnergyRefreshAt,
     storyProgress: { ...merged.storyProgress, chapterId, unlockedChapterIds } };
 }
 
@@ -152,6 +178,31 @@ export const useGameStore = create<GameStore>()(
         const nextGenerationQueue = generationQueue.length ? generationQueue : createGenerationBatch(generatedTileCount);
         set({ energy: state.energy - 1, board, generatedTileCount, generationQueue: nextGenerationQueue,
           lastSavedAt: new Date().toISOString() });
+      },
+      generateTiles: () => {
+        const state = get();
+        const currentBoard = [...state.board, ...Array(Math.max(0, boardCapacity - state.board.length)).fill(null)];
+        const emptyIndices = currentBoard.reduce<number[]>((indices, tile, index) => {
+          if (!tile) indices.push(index);
+          return indices;
+        }, []);
+        const amount = Math.min(state.energy, emptyIndices.length);
+        if (!amount) return 0;
+
+        const board = [...currentBoard];
+        let generationQueue = state.generationQueue.length
+          ? [...state.generationQueue]
+          : createGenerationBatch(state.generatedTileCount);
+        let generatedTileCount = state.generatedTileCount;
+        emptyIndices.slice(0, amount).forEach(index => {
+          const resource = generationQueue.shift()!;
+          board[index] = { id: `${Date.now()}-${generatedTileCount}`, kind: resource, level: 1 };
+          generatedTileCount += 1;
+          if (!generationQueue.length) generationQueue = createGenerationBatch(generatedTileCount);
+        });
+
+        set({ energy: state.energy - amount, board, generatedTileCount, generationQueue, lastSavedAt: new Date().toISOString() });
+        return amount;
       },
       spendCoins: amount => {
         if (!Number.isFinite(amount) || amount <= 0 || get().coins < amount) return false;
@@ -189,6 +240,11 @@ export const useGameStore = create<GameStore>()(
         set({ board: result.board, coins: state.coins + result.reward, mergeCount: state.mergeCount + 1,
           lastSavedAt: new Date().toISOString() });
         return true;
+      },
+      clearMossAt: index => {
+        const state = get();
+        if (!state.mossyCellIndices.includes(index)) return;
+        set({ mossyCellIndices: state.mossyCellIndices.filter(cellIndex => cellIndex !== index), lastSavedAt: new Date().toISOString() });
       },
       deliverProjectTile: tileId => {
         const state = get();
@@ -229,6 +285,45 @@ export const useGameStore = create<GameStore>()(
           lastSavedAt: now });
         return reward;
       },
+      canClaimRewardedEnergy: () => {
+        const state = get();
+        if (state.energy >= state.maxEnergy) return false;
+        const now = new Date();
+        const count = state.lastRewardedAdAt && isSameLocalDay(state.lastRewardedAdAt, now.toISOString())
+          ? state.rewardedAdWatchCount
+          : 0;
+        if (count >= rewardedAdDailyLimit) return false;
+        return !state.lastRewardedAdAt || now.getTime() - new Date(state.lastRewardedAdAt).getTime() >= rewardedAdCooldownMs;
+      },
+      canClaimRewardedGem: () => {
+        const state = get();
+        const now = new Date();
+        const count = state.lastRewardedAdAt && isSameLocalDay(state.lastRewardedAdAt, now.toISOString())
+          ? state.rewardedAdWatchCount
+          : 0;
+        if (count >= rewardedAdDailyLimit) return false;
+        return !state.lastRewardedAdAt || now.getTime() - new Date(state.lastRewardedAdAt).getTime() >= rewardedAdCooldownMs;
+      },
+      claimRewardedEnergy: () => {
+        if (!get().canClaimRewardedEnergy()) return false;
+        const state = get();
+        const now = new Date().toISOString();
+        const count = state.lastRewardedAdAt && isSameLocalDay(state.lastRewardedAdAt, now)
+          ? state.rewardedAdWatchCount + 1
+          : 1;
+        set({ energy: Math.min(state.maxEnergy, state.energy + rewardedEnergyAmount), rewardedAdWatchCount: count, lastRewardedAdAt: now, lastSavedAt: now });
+        return true;
+      },
+      claimRewardedGem: () => {
+        if (!get().canClaimRewardedGem()) return false;
+        const state = get();
+        const now = new Date().toISOString();
+        const count = state.lastRewardedAdAt && isSameLocalDay(state.lastRewardedAdAt, now)
+          ? state.rewardedAdWatchCount + 1
+          : 1;
+        set({ gems: state.gems + 1, rewardedAdWatchCount: count, lastRewardedAdAt: now, lastSavedAt: now });
+        return true;
+      },
       selectChapter: chapterId => {
         const state = get();
         if (!state.storyProgress.unlockedChapterIds.includes(chapterId)) return;
@@ -256,15 +351,17 @@ export const useGameStore = create<GameStore>()(
         const completedTaskIds = [...state.storyProgress.completedTaskIds, task.id];
         const nextChapter = storyChapters[chapterIndex + 1];
         const chapterFinished = chapter.tasks.every(candidate => completedTaskIds.includes(candidate.id));
+        const chapterReward = chapterFinished ? getChapterCompletionReward(chapter.id) : null;
         const unlockedChapterIds = chapterFinished && nextChapter && !state.storyProgress.unlockedChapterIds.includes(nextChapter.id)
           ? [...state.storyProgress.unlockedChapterIds, nextChapter.id]
           : state.storyProgress.unlockedChapterIds;
-        set({ inventory: nextInventory, coins: state.coins + task.reward.coins,
-          gems: state.gems + (task.reward.gems ?? 0),
+        set({ inventory: nextInventory, coins: state.coins + task.reward.coins + (chapterReward?.coins ?? 0),
+          gems: state.gems + (task.reward.gems ?? 0) + (chapterReward?.gems ?? 0),
+          energy: Math.min(state.maxEnergy, state.energy + (chapterReward?.energy ?? 0)),
           storyProgress: { ...state.storyProgress,
             completedTaskIds,
             unlockedChapterIds,
-            restoredAreaIds: [...state.storyProgress.restoredAreaIds, task.id] },
+            restoredAreaIds: [...state.storyProgress.restoredAreaIds, task.id, ...(chapterFinished ? [chapter.id] : [])] },
           lastSavedAt: new Date().toISOString() });
         return true;
       },

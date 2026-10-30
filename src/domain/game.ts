@@ -28,6 +28,10 @@ export type PlayerState = {
   mergeCount: number;
   generatedTileCount: number;
   generationQueue: ResourceKind[];
+  /** Cells covered in seaweed can only be cleared by merging onto their tile. */
+  mossyCellIndices: number[];
+  rewardedAdWatchCount: number;
+  lastRewardedAdAt: string | null;
   endlessProjectCount: number;
   hasSeenIntro: boolean;
   tutorialPhase: 'welcome' | 'board' | 'complete';

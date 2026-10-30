@@ -1,5 +1,7 @@
 /* global jest */
 
+require('react-native-gesture-handler/jestSetup');
+
 jest.mock('@react-native-async-storage/async-storage', () => {
   const values = new Map();
   return {
@@ -47,6 +49,21 @@ jest.mock('@invertase/react-native-apple-authentication', () => {
     },
   };
 });
+
+jest.mock('react-native-google-mobile-ads', () => ({
+  __esModule: true,
+  default: () => ({ initialize: jest.fn().mockResolvedValue({}) }),
+  AdEventType: { ERROR: 'error', CLOSED: 'closed' },
+  RewardedAdEventType: { LOADED: 'rewarded_loaded', EARNED_REWARD: 'rewarded_earned_reward' },
+  TestIds: { REWARDED: 'test-rewarded-ad' },
+  RewardedAd: {
+    createForAdRequest: jest.fn(() => ({
+      addAdEventListener: jest.fn(() => jest.fn()),
+      load: jest.fn(),
+      show: jest.fn().mockResolvedValue(undefined),
+    })),
+  },
+}));
 
 jest.mock('lucide-react-native', () => {
   const Icon = () => null;
