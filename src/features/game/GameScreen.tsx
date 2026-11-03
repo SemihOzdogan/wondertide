@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Image, ImageBackground, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, ImageBackground, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -33,6 +33,8 @@ const miraQuestImage = require('../../../assets/images/mira-quest-portrait-v1.pn
 const logoImage = require('../../../assets/images/wondertide-logo-v1.png');
 const hudCoinImage = require('../../../assets/images/hud-coin-v1.png');
 const hudGemImage = require('../../../assets/images/hud-gem-v1.png');
+const gemNoticeImageStyle = { width: 58, height: 58, resizeMode: 'contain' as const, marginTop: 13, marginBottom: 2 };
+const gemNoticeConfirmStyle = { backgroundColor: '#5A79D8', borderColor: '#BFD0FF', shadowColor: '#344A9A' };
 const itemImages: Record<ResourceKind, number> = {
   driftwood: require('../../../assets/images/item-driftwood.png'),
   seaGlass: require('../../../assets/images/item-sea-glass.png'),
@@ -271,16 +273,17 @@ function TopBar({ energy, maxEnergy, coins, gems, topInset }: { energy: number; 
 function Pill({ icon, value, tone, onPress }: { icon: string; value: string | number; tone: 'energy' | 'coin' | 'gem'; onPress?: () => void }) {
   const canClaimRewardedGem = useGameStore(state => state.canClaimRewardedGem);
   const claimRewardedGem = useGameStore(state => state.claimRewardedGem);
+  const [gemNotice, setGemNotice] = useState<{ title: string; body: string; success?: boolean } | null>(null);
   const toneStyle = tone === 'energy' ? styles.energyIcon : tone === 'coin' ? styles.coinIcon : styles.gemIcon;
   const iconNode = tone === 'coin' ? <Image source={hudCoinImage} style={styles.currencyImage} /> : tone === 'gem' ? <Image source={hudGemImage} style={styles.currencyImage} /> : <Text style={[styles.pillIcon, toneStyle]}>{icon}</Text>;
   const handlePress = async () => {
     if (tone !== 'gem' || Number(value) > 0) { onPress?.(); return; }
-    if (!canClaimRewardedGem()) { Alert.alert('Reklam ödülü hazır değil', 'Günlük hakkın bitmiş olabilir ya da bekleme süresi devam ediyor.'); return; }
+    if (!canClaimRewardedGem()) { setGemNotice({ title: 'Reklam ödülü hazır değil', body: 'Günlük hakkın bitmiş olabilir ya da bekleme süresi devam ediyor.' }); return; }
     const result = await showRewardedEnergyAd();
-    if (result === 'completed' && claimRewardedGem()) { Alert.alert('Elmas kazandın!', '+1 elmas hesabına eklendi.'); return; }
-    Alert.alert('Reklam hazır değil', result === 'unavailable' ? 'Şu an gösterilecek reklam yok. Biraz sonra yeniden dene.' : 'Reklam tamamlanmadığı için ödül eklenmedi.');
+    if (result === 'completed' && claimRewardedGem()) { setGemNotice({ title: 'Elmas kazandın!', body: '+1 elmas hesabına eklendi.', success: true }); return; }
+    setGemNotice({ title: 'Reklam hazır değil', body: result === 'unavailable' ? 'Şu an gösterilecek reklam yok. Biraz sonra yeniden dene.' : 'Reklam tamamlanmadığı için ödül eklenmedi.' });
   };
-  return <Pressable accessibilityRole="button" accessibilityLabel={tone === 'coin' ? 'Altınla enerji al' : tone === 'gem' ? 'Elmas al' : 'Enerji'} onPress={handlePress} disabled={!onPress && tone !== 'gem'} style={[styles.pill, tone === 'energy' && styles.energyPill, tone === 'coin' && styles.coinPill, tone === 'gem' && styles.gemPill]}>{iconNode}<Text style={styles.pillText}>{value}</Text>{tone !== 'energy' ? <Text style={styles.pillPlus}>+</Text> : null}</Pressable>;
+  return <><Pressable accessibilityRole="button" accessibilityLabel={tone === 'coin' ? 'Altınla enerji al' : tone === 'gem' ? 'Elmas al' : 'Enerji'} onPress={handlePress} disabled={!onPress && tone !== 'gem'} style={[styles.pill, tone === 'energy' && styles.energyPill, tone === 'coin' && styles.coinPill, tone === 'gem' && styles.gemPill]}>{iconNode}<Text style={styles.pillText}>{value}</Text>{tone !== 'energy' ? <Text style={styles.pillPlus}>+</Text> : null}</Pressable><Modal transparent visible={gemNotice !== null} animationType="fade" onRequestClose={() => setGemNotice(null)}><View style={styles.offerBackdrop}><Pressable accessibilityLabel="Elmas bildirimini kapat" onPress={() => setGemNotice(null)} style={styles.offerDismissArea} /><View style={styles.offerCard}><Pressable accessibilityLabel="Kapat" onPress={() => setGemNotice(null)} style={styles.offerClose}><Text style={styles.offerCloseText}>×</Text></Pressable><Text style={styles.offerEyebrow}>ELMAS ÖDÜLÜ</Text><Image source={hudGemImage} style={gemNoticeImageStyle} /><Text style={styles.offerTitle}>{gemNotice?.title}</Text><Text style={styles.offerBody}>{gemNotice?.body}</Text><Pressable accessibilityRole="button" onPress={() => setGemNotice(null)} style={[styles.offerConfirm, gemNotice?.success && gemNoticeConfirmStyle]}><Text style={styles.offerConfirmText}>Tamam</Text></Pressable></View></View></Modal></>;
 }
 function RequirementLine({ task, inventory }: { task: StoryTask; inventory: Record<ResourceKind, number> }) { return <View style={styles.requirements}>{resources.map(kind => task.requirements[kind] ? <View key={kind} style={styles.requirement}><Image source={itemImages[kind]} style={styles.requirementIcon} /><Text style={styles.requirementText}>{inventory[kind]}/{task.requirements[kind]}</Text></View> : null)}</View>; }
 const projectPartNames: Record<ResourceKind, string> = { driftwood: 'Kiriş', seaGlass: 'Mercek', shell: 'Mühür' };
