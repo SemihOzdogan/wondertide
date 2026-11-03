@@ -145,13 +145,29 @@ test('awards a rewarded gem even when the energy bar is full', () => {
     energy: 100,
     maxEnergy: 100,
     gems: 0,
-    rewardedAdWatchCount: 0,
-    lastRewardedAdAt: null,
+    rewardedGemAdWatchCount: 0,
+    lastRewardedGemAdAt: null,
   });
 
   expect(useGameStore.getState().canClaimRewardedGem()).toBe(true);
   expect(useGameStore.getState().claimRewardedGem()).toBe(true);
   expect(useGameStore.getState().gems).toBe(1);
+});
+
+test('keeps energy and gem rewarded-ad limits independent', () => {
+  useGameStore.setState({
+    energy: 90,
+    maxEnergy: 100,
+    rewardedEnergyAdWatchCount: 0,
+    lastRewardedEnergyAdAt: null,
+    rewardedGemAdWatchCount: 5,
+    lastRewardedGemAdAt: new Date().toISOString(),
+  });
+
+  expect(useGameStore.getState().canClaimRewardedGem()).toBe(false);
+  expect(useGameStore.getState().canClaimRewardedEnergy()).toBe(true);
+  expect(useGameStore.getState().claimRewardedEnergy()).toBe(true);
+  expect(useGameStore.getState().energy).toBe(95);
 });
 
 test('refills the next-resource preview when a generation batch is exhausted', () => {

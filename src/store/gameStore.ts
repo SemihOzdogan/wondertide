@@ -17,7 +17,7 @@ const initialPlayerState: PlayerState = {
   inventory: { driftwood: 0, seaGlass: 0, shell: 0 },
   board: initialBoard,
   storyProgress: { chapterId: 'lighthouse-tales', unlockedChapterIds: ['lighthouse-tales'], completedTaskIds: [], restoredAreaIds: [] },
-  mergeCount: 0, generatedTileCount: 0, generationQueue: ['driftwood', 'seaGlass', 'shell', 'driftwood', 'seaGlass', 'shell'], mossyCellIndices: [4, 13, 25], rewardedAdWatchCount: 0, lastRewardedAdAt: null, endlessProjectCount: 0, hasSeenIntro: false, tutorialPhase: 'welcome', tutorialVersion: 5, lastSavedAt: new Date().toISOString(),
+  mergeCount: 0, generatedTileCount: 0, generationQueue: ['driftwood', 'seaGlass', 'shell', 'driftwood', 'seaGlass', 'shell'], mossyCellIndices: [4, 13, 25], rewardedEnergyAdWatchCount: 0, lastRewardedEnergyAdAt: null, rewardedGemAdWatchCount: 0, lastRewardedGemAdAt: null, endlessProjectCount: 0, hasSeenIntro: false, tutorialPhase: 'welcome', tutorialVersion: 5, lastSavedAt: new Date().toISOString(),
 };
 
 type GameStore = PlayerState & {
@@ -110,6 +110,14 @@ function isYesterday(first: string, second: string) {
 }
 
 function normalizePlayer(player: Partial<PlayerState>): PlayerState {
+  // v1 stored a single shared ad counter. Preserve that usage for each reward
+  // type when migrating rather than letting existing players reset their limit.
+  const legacyPlayer = player as Partial<PlayerState> & {
+    rewardedAdWatchCount?: number;
+    lastRewardedAdAt?: string | null;
+  };
+  const legacyCount = Number.isInteger(legacyPlayer.rewardedAdWatchCount) ? Number(legacyPlayer.rewardedAdWatchCount) : 0;
+  const legacyLastRewardedAt = legacyPlayer.lastRewardedAdAt ?? null;
   const merged = {
     ...initialPlayerState,
     ...player,
@@ -151,6 +159,10 @@ function normalizePlayer(player: Partial<PlayerState>): PlayerState {
     ? [...new Set(merged.mossyCellIndices.filter(index => Number.isInteger(index) && index >= 0 && index < boardCapacity))]
     : initialPlayerState.mossyCellIndices;
   return { ...merged, hasSeenIntro: isCurrentTutorial ? merged.hasSeenIntro : false, tutorialPhase, tutorialVersion: initialPlayerState.tutorialVersion, board, generationQueue: generationQueue.length ? generationQueue : createGenerationBatch(merged.generatedTileCount), mossyCellIndices, energy, lastEnergyRefreshAt,
+    rewardedEnergyAdWatchCount: Number.isInteger(player.rewardedEnergyAdWatchCount) ? Number(player.rewardedEnergyAdWatchCount) : legacyCount,
+    lastRewardedEnergyAdAt: player.lastRewardedEnergyAdAt ?? legacyLastRewardedAt,
+    rewardedGemAdWatchCount: Number.isInteger(player.rewardedGemAdWatchCount) ? Number(player.rewardedGemAdWatchCount) : legacyCount,
+    lastRewardedGemAdAt: player.lastRewardedGemAdAt ?? legacyLastRewardedAt,
     storyProgress: { ...merged.storyProgress, chapterId, unlockedChapterIds } };
 }
 
@@ -289,39 +301,39 @@ export const useGameStore = create<GameStore>()(
         const state = get();
         if (state.energy >= state.maxEnergy) return false;
         const now = new Date();
-        const count = state.lastRewardedAdAt && isSameLocalDay(state.lastRewardedAdAt, now.toISOString())
-          ? state.rewardedAdWatchCount
+        const count = state.lastRewardedEnergyAdAt && isSameLocalDay(state.lastRewardedEnergyAdAt, now.toISOString())
+          ? state.rewardedEnergyAdWatchCount
           : 0;
         if (count >= rewardedAdDailyLimit) return false;
-        return !state.lastRewardedAdAt || now.getTime() - new Date(state.lastRewardedAdAt).getTime() >= rewardedAdCooldownMs;
+        return !state.lastRewardedEnergyAdAt || now.getTime() - new Date(state.lastRewardedEnergyAdAt).getTime() >= rewardedAdCooldownMs;
       },
       canClaimRewardedGem: () => {
         const state = get();
         const now = new Date();
-        const count = state.lastRewardedAdAt && isSameLocalDay(state.lastRewardedAdAt, now.toISOString())
-          ? state.rewardedAdWatchCount
+        const count = state.lastRewardedGemAdAt && isSameLocalDay(state.lastRewardedGemAdAt, now.toISOString())
+          ? state.rewardedGemAdWatchCount
           : 0;
         if (count >= rewardedAdDailyLimit) return false;
-        return !state.lastRewardedAdAt || now.getTime() - new Date(state.lastRewardedAdAt).getTime() >= rewardedAdCooldownMs;
+        return !state.lastRewardedGemAdAt || now.getTime() - new Date(state.lastRewardedGemAdAt).getTime() >= rewardedAdCooldownMs;
       },
       claimRewardedEnergy: () => {
         if (!get().canClaimRewardedEnergy()) return false;
         const state = get();
         const now = new Date().toISOString();
-        const count = state.lastRewardedAdAt && isSameLocalDay(state.lastRewardedAdAt, now)
-          ? state.rewardedAdWatchCount + 1
+        const count = state.lastRewardedEnergyAdAt && isSameLocalDay(state.lastRewardedEnergyAdAt, now)
+          ? state.rewardedEnergyAdWatchCount + 1
           : 1;
-        set({ energy: Math.min(state.maxEnergy, state.energy + rewardedEnergyAmount), rewardedAdWatchCount: count, lastRewardedAdAt: now, lastSavedAt: now });
+        set({ energy: Math.min(state.maxEnergy, state.energy + rewardedEnergyAmount), rewardedEnergyAdWatchCount: count, lastRewardedEnergyAdAt: now, lastSavedAt: now });
         return true;
       },
       claimRewardedGem: () => {
         if (!get().canClaimRewardedGem()) return false;
         const state = get();
         const now = new Date().toISOString();
-        const count = state.lastRewardedAdAt && isSameLocalDay(state.lastRewardedAdAt, now)
-          ? state.rewardedAdWatchCount + 1
+        const count = state.lastRewardedGemAdAt && isSameLocalDay(state.lastRewardedGemAdAt, now)
+          ? state.rewardedGemAdWatchCount + 1
           : 1;
-        set({ gems: state.gems + 1, rewardedAdWatchCount: count, lastRewardedAdAt: now, lastSavedAt: now });
+        set({ gems: state.gems + 1, rewardedGemAdWatchCount: count, lastRewardedGemAdAt: now, lastSavedAt: now });
         return true;
       },
       selectChapter: chapterId => {

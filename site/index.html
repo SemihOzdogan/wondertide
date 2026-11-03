@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#062d43">
+    <title>Wondertide — Sakin kıyılarda birleştir, keşfet</title>
+    <style>
+      :root { font-family: ui-rounded, "Avenir Next", Avenir, "Segoe UI", sans-serif; color: #f3fbfc; background: #062d43; }
+      * { box-sizing: border-box; }
+      body { min-width: 320px; margin: 0; overflow-x: hidden; background: radial-gradient(circle at 10% 7%, #258c9e 0, transparent 27rem), radial-gradient(circle at 88% 25%, #d27c53 0, transparent 23rem), linear-gradient(155deg, #062d43 0%, #0b5061 48%, #103b5a 100%); }
+      a { color: inherit; }
+      .shell { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+      header { display: flex; align-items: center; justify-content: space-between; padding: 24px 0; }
+      .brand { display: inline-flex; gap: 10px; align-items: center; color: #fff; font-weight: 800; letter-spacing: .02em; text-decoration: none; }
+      .mark { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid #9be0dc; border-radius: 50% 50% 48% 52%; background: #156b79; box-shadow: inset 0 -5px #0d4f67; }
+      .nav-link { padding: 10px 14px; border: 1px solid rgba(218, 250, 247, .46); border-radius: 999px; color: #fff; font-size: .9rem; font-weight: 700; text-decoration: none; }
+      .hero { display: grid; grid-template-columns: 1.2fr .8fr; align-items: center; min-height: 570px; gap: 48px; padding: 66px 0 88px; }
+      .eyebrow { margin: 0 0 14px; color: #b5f2ea; font-size: .76rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+      h1 { max-width: 680px; margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(3.1rem, 7vw, 6.2rem); font-weight: 700; letter-spacing: -.055em; line-height: .94; }
+      .lede { max-width: 560px; margin: 26px 0 0; color: #d2edf0; font-size: clamp(1.05rem, 2vw, 1.25rem); line-height: 1.65; }
+      .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+      .button { display: inline-block; padding: 13px 19px; border-radius: 999px; background: #f7c969; color: #173747; font-size: .94rem; font-weight: 850; text-decoration: none; box-shadow: 0 9px 22px rgba(0, 19, 35, .22); }
+      .button.secondary { border: 1px solid rgba(231, 255, 252, .55); background: rgba(3, 48, 67, .26); color: #fff; box-shadow: none; }
+      .scene { position: relative; min-height: 330px; }
+      .orb { position: absolute; width: 290px; height: 290px; right: 2%; top: 4%; border: 9px solid rgba(255, 236, 183, .42); border-radius: 50%; background: radial-gradient(circle at 36% 28%, #fffbd9 0 4%, #ffe9a4 5% 22%, #eaa461 23% 38%, #bf6d52 39% 65%, #115568 66%); box-shadow: 0 25px 60px rgba(0, 24, 38, .28); }
+      .wave { position: absolute; right: -4%; bottom: 0; width: 115%; height: 125px; border-radius: 58% 42% 0 0 / 43% 35% 0 0; background: repeating-radial-gradient(ellipse at 45% 110%, transparent 0 22px, rgba(156, 235, 226, .45) 23px 26px, transparent 27px 50px), #0b6070; transform: rotate(-4deg); }
+      .float { position: absolute; display: grid; place-items: center; width: 74px; height: 74px; border: 1px solid rgba(255,255,255,.45); border-radius: 34% 66% 51% 49%; background: rgba(10, 100, 116, .78); box-shadow: 0 18px 30px rgba(0, 30, 45, .22); font-size: 2rem; }
+      .float.one { top: 11%; left: 2%; transform: rotate(-13deg); }.float.two { right: 2%; bottom: 16%; transform: rotate(15deg); }
+      .strip { padding: 58px 0; background: rgba(2, 37, 57, .48); }
+      .strip h2 { margin: 0 0 30px; font-family: Georgia, "Times New Roman", serif; font-size: clamp(2rem, 4vw, 3rem); }
+      .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+      .card { min-height: 180px; padding: 23px; border: 1px solid rgba(178, 239, 234, .25); border-radius: 20px; background: rgba(13, 91, 105, .35); }
+      .card span { font-size: 1.65rem; }.card h3 { margin: 17px 0 8px; font-size: 1.08rem; }.card p { margin: 0; color: #c4e3e5; line-height: 1.55; }
+      footer { display: flex; justify-content: space-between; gap: 18px; padding: 30px 0 36px; color: #acd6d8; font-size: .88rem; }
+      footer nav { display: flex; gap: 17px; } footer a { text-underline-offset: 3px; }
+      @media (max-width: 720px) { .shell { width: min(100% - 32px, 1120px); }.hero { grid-template-columns: 1fr; gap: 16px; min-height: unset; padding-top: 48px; }.scene { min-height: 260px; }.orb { width: 220px; height: 220px; }.cards { grid-template-columns: 1fr; }.card { min-height: unset; } footer { flex-direction: column; } }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header>
+        <a class="brand" href="./" aria-label="Wondertide ana sayfa"><span class="mark">✦</span> Wondertide</a>
+        <a class="nav-link" href="https://semihozdogan.github.io/wondertide/support/">Destek</a>
+      </header>
+      <main class="hero">
+        <section>
+          <p class="eyebrow">Kıyıda yeni bir macera</p>
+          <h1>Birleştir.<br>Keşfet.<br>Akıntıya kapıl.</h1>
+          <p class="lede">Wondertide; huzurlu kıyılarda kaynakları birleştirip adaların gizemini çözdüğün bir bulmaca macerası.</p>
+          <div class="actions"><a class="button" href="https://semihozdogan.github.io/wondertide/support/">Destek merkezine git</a><a class="button secondary" href="https://semihozdogan.github.io/wondertide/privacy/">Gizlilik politikası</a></div>
+        </section>
+        <div class="scene" aria-hidden="true"><div class="orb"></div><div class="float one">🐚</div><div class="float two">✦</div><div class="wave"></div></div>
+      </main>
+    </div>
+    <section class="strip"><div class="shell"><h2>Denizin çağrısını takip et</h2><div class="cards"><article class="card"><span>🧩</span><h3>Birleştir ve ilerle</h3><p>Kaynakları eşleştir, yeni parçalar üret ve adanı dönüştür.</p></article><article class="card"><span>🗺️</span><h3>Yeni kıyılar keşfet</h3><p>Her bölüm, sırlarını açmak için seni bekleyen yeni bir hikâye taşır.</p></article><article class="card"><span>🌊</span><h3>Kendi hızında oyna</h3><p>Sakin bir keşif yolculuğuna kaldığın yerden her zaman devam edebilirsin.</p></article></div></div></section>
+    <footer class="shell"><span>© 2026 Wondertide</span><nav><a href="https://semihozdogan.github.io/wondertide/support/">Destek</a><a href="https://semihozdogan.github.io/wondertide/privacy/">Gizlilik</a></nav></footer>
+  </body>
+</html>

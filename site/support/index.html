@@ -3,34 +3,19 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Wondertide Destek</title>
+    <meta name="theme-color" content="#062d43">
+    <title>Destek — Wondertide</title>
     <style>
-      :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #183341; background: #f6fbfa; }
-      body { margin: 0; line-height: 1.6; }
-      main { box-sizing: border-box; max-width: 720px; margin: 0 auto; padding: 56px 24px 72px; }
-      .eyebrow { color: #317560; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: .75rem; }
-      h1 { font-size: clamp(2rem, 6vw, 3.25rem); line-height: 1.08; margin: 12px 0 16px; }
-      h2 { margin-top: 36px; }
-      a { color: #176eaa; font-weight: 650; }
-      .card { background: #fff; border: 1px solid #d7e8e1; border-radius: 18px; padding: 22px; margin-top: 24px; }
-      footer { margin-top: 52px; color: #58706d; font-size: .9rem; }
+      :root { font-family: ui-rounded, "Avenir Next", Avenir, "Segoe UI", sans-serif; color: #f3fbfc; background: #062d43; }
+      * { box-sizing: border-box; } body { min-width: 320px; margin: 0; background: radial-gradient(circle at 8% 4%, #258c9e 0, transparent 28rem), radial-gradient(circle at 92% 13%, #cf7954 0, transparent 25rem), linear-gradient(155deg, #062d43, #0b5061 54%, #103b5a); } a { color: inherit; }
+      .shell { width: min(900px, calc(100% - 40px)); margin: 0 auto; } header { display: flex; align-items: center; justify-content: space-between; padding: 24px 0; }.brand { display: inline-flex; align-items: center; gap: 10px; color: #fff; font-weight: 800; letter-spacing: .02em; text-decoration: none; }.mark { display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid #9be0dc; border-radius: 50% 50% 48% 52%; background: #156b79; box-shadow: inset 0 -5px #0d4f67; }.nav { display: flex; gap: 9px; }.nav a { padding: 9px 13px; border: 1px solid rgba(218,250,247,.46); border-radius: 999px; color: #fff; font-size: .88rem; font-weight: 700; text-decoration: none; }
+      main { padding: 64px 0 80px; }.eyebrow { margin: 0 0 14px; color: #b5f2ea; font-size: .76rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; } h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(3rem, 8vw, 5.2rem); letter-spacing: -.055em; line-height: .95; }.lede { max-width: 610px; margin: 22px 0 38px; color: #d2edf0; font-size: 1.12rem; line-height: 1.7; }
+      .cards { display: grid; gap: 16px; }.card { padding: clamp(22px, 4vw, 32px); border: 1px solid rgba(178,239,234,.28); border-radius: 22px; background: rgba(8,74,91,.54); box-shadow: 0 18px 38px rgba(0,24,38,.14); }.icon { display: grid; width: 45px; height: 45px; place-items: center; border-radius: 15px; background: rgba(156,235,226,.16); font-size: 1.45rem; }.card h2 { margin: 16px 0 9px; font-size: 1.25rem; }.card p { margin: 0; color: #c4e3e5; line-height: 1.65; }.card p + p { margin-top: 12px; }.button { display: inline-block; margin-top: 19px; padding: 12px 17px; border-radius: 999px; background: #f7c969; color: #173747; font-size: .93rem; font-weight: 850; text-decoration: none; } footer { display: flex; justify-content: space-between; gap: 16px; padding: 28px 0 36px; color: #acd6d8; font-size: .88rem; } footer nav { display: flex; gap: 17px; } footer a { text-underline-offset: 3px; } @media (max-width: 560px) { .shell { width: min(100% - 32px, 900px); }.nav a { padding: 8px 10px; } main { padding-top: 45px; } footer { flex-direction: column; } }
     </style>
   </head>
   <body>
-    <main>
-      <p class="eyebrow">Wondertide</p>
-      <h1>Destek</h1>
-      <p>Wondertide ile ilgili bir sorun mu yaşıyorsun? Yardım etmek için buradayız.</p>
-      <section class="card">
-        <h2>Nasıl yardım alabilirim?</h2>
-        <p>Hata bildirimi, geri bildirim veya hesapla ilgili yardım için <a href="https://github.com/SemihOzdogan/wondertide/issues">GitHub destek sayfamızdan</a> yeni bir talep oluşturabilirsin.</p>
-        <p>Talebine cihaz modelini, iOS sürümünü ve sorunun oluştuğu adımları eklersen daha hızlı yardımcı olabiliriz.</p>
-      </section>
-      <section>
-        <h2>Hesap ve ilerleme</h2>
-        <p>Google, Apple veya e-posta hesabınla oturum açtıysan ilerlemen hesabınla eşitlenir. Giriş sorunu yaşıyorsan destek talebine kullandığın giriş yöntemini ekle.</p>
-      </section>
-      <footer><a href="../privacy/">Gizlilik Politikası</a></footer>
-    </main>
+    <div class="shell"><header><a class="brand" href="../" aria-label="Wondertide ana sayfa"><span class="mark">✦</span> Wondertide</a><nav class="nav"><a href="../">Ana sayfa</a><a href="../privacy/">Gizlilik</a></nav></header>
+      <main><p class="eyebrow">Yanındayız</p><h1>Destek merkezi</h1><p class="lede">Dalgalar biraz yükseldiğinde, sana yeniden sakin sulara dönmen için yardımcı oluruz.</p><div class="cards"><section class="card"><div class="icon">✉️</div><h2>Yardım iste</h2><p>Hata bildirimi, geri bildirim veya hesapla ilgili yardım için destek sayfamızdan yeni bir talep oluşturabilirsin.</p><p>Cihaz modelini, iOS sürümünü ve sorunun oluştuğu adımları eklersen daha hızlı yardımcı olabiliriz.</p><a class="button" href="https://github.com/SemihOzdogan/wondertide/issues">GitHub’da destek iste</a></section><section class="card"><div class="icon">☁️</div><h2>Hesap ve ilerleme</h2><p>Google, Apple veya e-posta hesabınla oturum açtıysan ilerlemen hesabınla eşitlenir. Giriş sorunu için talebine kullandığın giriş yöntemini ekle.</p></section></div></main>
+      <footer><span>© 2026 Wondertide</span><nav><a href="../">Ana sayfa</a><a href="../privacy/">Gizlilik Politikası</a></nav></footer></div>
   </body>
 </html>
