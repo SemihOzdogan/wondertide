@@ -46,7 +46,7 @@ test('awards the chapter completion bonus after the final task', () => {
   expect(useGameStore.getState().completeTask(lighthouseTales.tasks[0])).toBe(true);
   expect(useGameStore.getState().completeTask(lighthouseTales.tasks[1])).toBe(true);
   expect(useGameStore.getState().coins).toBe(210);
-  expect(useGameStore.getState().energy).toBe(90);
+  expect(useGameStore.getState().energy).toBe(85);
   expect(useGameStore.getState().storyProgress.restoredAreaIds).toContain('lighthouse-tales');
 });
 

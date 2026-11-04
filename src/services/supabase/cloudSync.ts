@@ -23,6 +23,8 @@ function stateFromStore(state: PlayerState): PlayerState {
     rewardedGemAdWatchCount: state.rewardedGemAdWatchCount,
     lastRewardedGemAdAt: state.lastRewardedGemAdAt,
     endlessProjectCount: state.endlessProjectCount,
+    dailyChallengeBestScore: state.dailyChallengeBestScore,
+    lastDailyChallengeAt: state.lastDailyChallengeAt,
     hasSeenIntro: state.hasSeenIntro,
     tutorialPhase: state.tutorialPhase,
     tutorialVersion: state.tutorialVersion,

@@ -35,6 +35,9 @@ export type PlayerState = {
   rewardedGemAdWatchCount: number;
   lastRewardedGemAdAt: string | null;
   endlessProjectCount: number;
+  /** Best score achieved in the shared daily 20-move challenge. */
+  dailyChallengeBestScore: number;
+  lastDailyChallengeAt: string | null;
   hasSeenIntro: boolean;
   tutorialPhase: 'welcome' | 'board' | 'complete';
   tutorialVersion: number;

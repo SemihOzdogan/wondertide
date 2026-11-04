@@ -4,6 +4,7 @@ import { moonlitHarbor } from './moonlitHarbor';
 import { coralCove } from './coralCove';
 import { stormwatchCliffs } from './stormwatchCliffs';
 import { chaptersToCompleteTheStory } from './tideboundStories';
+import { endgameTideChapters } from './endgameTideStories';
 
 // New story packs are registered here. The game UI only relies on StoryChapter.
 export const storyChapters: StoryChapter[] = [
@@ -12,4 +13,5 @@ export const storyChapters: StoryChapter[] = [
   coralCove,
   stormwatchCliffs,
   ...chaptersToCompleteTheStory,
+  ...endgameTideChapters,
 ];

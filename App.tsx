@@ -17,7 +17,13 @@ function App() {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <StatusBar barStyle="light-content" />
-        <CopilotProvider overlay="svg" animated backdropColor="rgba(4, 24, 36, 0.76)" tooltipComponent={CopilotTooltip}>
+        <CopilotProvider
+          overlay="svg"
+          animated
+          backdropColor="rgba(4, 24, 36, 0.76)"
+          tooltipComponent={CopilotTooltip}
+          tooltipStyle={styles.tutorialTooltip}
+        >
           <GameBootstrap />
         </CopilotProvider>
       </SafeAreaProvider>
@@ -67,4 +73,7 @@ function GameBootstrap() {
 
 export default App;
 
-const styles = StyleSheet.create({ root: { flex: 1 } });
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  tutorialTooltip: { paddingBottom: 16 },
+});
