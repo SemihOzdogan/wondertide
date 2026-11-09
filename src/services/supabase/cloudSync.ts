@@ -29,6 +29,13 @@ function stateFromStore(state: PlayerState): PlayerState {
     tutorialPhase: state.tutorialPhase,
     tutorialVersion: state.tutorialVersion,
     lastSavedAt: state.lastSavedAt,
+    weather: state.weather,
+    weatherUpdatedAt: state.weatherUpdatedAt,
+    companionBond: state.companionBond,
+    companionLastPlayedAt: state.companionLastPlayedAt,
+    treasureMapPieces: state.treasureMapPieces,
+    treasureMapClaimedChapterIds: state.treasureMapClaimedChapterIds,
+    islandDecorations: state.islandDecorations,
     musicEnabled: state.musicEnabled,
     effectsEnabled: state.effectsEnabled,
   };

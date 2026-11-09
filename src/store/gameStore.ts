@@ -3,11 +3,13 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { storyChapters } from '../content/stories';
+import { islandDecorationCatalog } from '../domain/game';
 import type {
   MergeTile,
   PlayerState,
   ResourceKind,
   StoryTask,
+  WeatherType,
 } from '../domain/game';
 import { mergeBoardTiles, projectTileLevel } from '../domain/gameEngine';
 
@@ -58,6 +60,13 @@ const initialPlayerState: PlayerState = {
   tutorialPhase: 'welcome',
   tutorialVersion: 5,
   lastSavedAt: new Date().toISOString(),
+  weather: 'sunny',
+  weatherUpdatedAt: new Date().toISOString(),
+  companionBond: 0,
+  companionLastPlayedAt: null,
+  treasureMapPieces: 0,
+  treasureMapClaimedChapterIds: [],
+  islandDecorations: [],
   musicEnabled: true,
   effectsEnabled: true,
 };
@@ -97,6 +106,11 @@ type GameStore = PlayerState & {
     musicEnabled?: boolean;
     effectsEnabled?: boolean;
   }) => void;
+  playWithCompanion: () => boolean;
+  claimTreasureMap: () => boolean;
+  buyIslandDecoration: (decorationId: string) => boolean;
+  removeIslandDecoration: (decorationId: string) => boolean;
+  refreshWeather: () => void;
 };
 
 const resourceOrder: ResourceKind[] = ['driftwood', 'seaGlass', 'shell'];
@@ -179,6 +193,11 @@ function isYesterday(first: string, second: string) {
   return isSameLocalDay(first, yesterday.toISOString());
 }
 
+function weatherForDate(date: Date): WeatherType {
+  const day = Math.floor(date.getTime() / 86400000);
+  return (['sunny', 'rainy', 'windy', 'foggy'] as WeatherType[])[day % 4];
+}
+
 function normalizePlayer(player: Partial<PlayerState>): PlayerState {
   // v1 stored a single shared ad counter. Preserve that usage for each reward
   // type when migrating rather than letting existing players reset their limit.
@@ -199,6 +218,11 @@ function normalizePlayer(player: Partial<PlayerState>): PlayerState {
       ...player.storyProgress,
     },
   };
+  const today = new Date().toISOString().slice(0, 10);
+  if (!merged.weatherUpdatedAt || !merged.weatherUpdatedAt.startsWith(today)) {
+    merged.weather = weatherForDate(new Date());
+    merged.weatherUpdatedAt = new Date().toISOString();
+  }
   const elapsed = Date.now() - new Date(merged.lastEnergyRefreshAt).getTime();
   const recovered = Math.max(0, Math.floor(elapsed / energyIntervalMs));
   const energy = Math.min(merged.maxEnergy, merged.energy + recovered);
@@ -266,6 +290,24 @@ function normalizePlayer(player: Partial<PlayerState>): PlayerState {
         ),
       ]
     : initialPlayerState.mossyCellIndices;
+  const treasureMapPieces = Math.max(
+    0,
+    Math.min(3, Number(merged.treasureMapPieces) || 0),
+  );
+  const treasureMapClaimedChapterIds = Array.isArray(
+    merged.treasureMapClaimedChapterIds,
+  )
+    ? [...new Set(merged.treasureMapClaimedChapterIds.filter(Boolean))]
+    : [];
+  const islandDecorations = Array.isArray(merged.islandDecorations)
+    ? [
+        ...new Set(
+          merged.islandDecorations.filter(decorationId =>
+            islandDecorationCatalog.some(item => item.id === decorationId),
+          ),
+        ),
+      ]
+    : [];
   return {
     ...merged,
     hasSeenIntro: isCurrentTutorial ? merged.hasSeenIntro : false,
@@ -276,6 +318,9 @@ function normalizePlayer(player: Partial<PlayerState>): PlayerState {
       ? generationQueue
       : createGenerationBatch(merged.generatedTileCount),
     mossyCellIndices,
+    treasureMapPieces,
+    treasureMapClaimedChapterIds,
+    islandDecorations,
     energy,
     lastEnergyRefreshAt,
     rewardedEnergyAdWatchCount: Number.isInteger(
@@ -298,10 +343,78 @@ export const useGameStore = create<GameStore>()(
     (set, get) => ({
       ...initialPlayerState,
       setAudioSettings: settings =>
-        set(state => ({
+        set(() => ({
           ...settings,
           lastSavedAt: new Date().toISOString(),
         })),
+      playWithCompanion: () => {
+        const state = get();
+        const today = new Date().toISOString().slice(0, 10);
+        if (state.companionLastPlayedAt === today) return false;
+        set({
+          companionBond: state.companionBond + 1,
+          companionLastPlayedAt: today,
+          coins: state.coins + 10,
+          lastSavedAt: new Date().toISOString(),
+        });
+        return true;
+      },
+      claimTreasureMap: () => {
+        const state = get();
+        const chapterId = state.storyProgress.chapterId;
+        if (
+          state.treasureMapPieces < 3 ||
+          state.treasureMapClaimedChapterIds.includes(chapterId)
+        )
+          return false;
+        set({
+          treasureMapPieces: 0,
+          treasureMapClaimedChapterIds: [
+            ...state.treasureMapClaimedChapterIds,
+            chapterId,
+          ],
+          coins: state.coins + 120,
+          gems: state.gems + 1,
+          lastSavedAt: new Date().toISOString(),
+        });
+        return true;
+      },
+      buyIslandDecoration: decorationId => {
+        const state = get();
+        const decoration = islandDecorationCatalog.find(
+          item => item.id === decorationId,
+        );
+        if (
+          !decoration ||
+          state.islandDecorations.includes(decorationId) ||
+          state.coins < decoration.cost
+        )
+          return false;
+        set({
+          coins: state.coins - decoration.cost,
+          islandDecorations: [...state.islandDecorations, decorationId],
+          lastSavedAt: new Date().toISOString(),
+        });
+        return true;
+      },
+      removeIslandDecoration: decorationId => {
+        const state = get();
+        if (!state.islandDecorations.includes(decorationId)) return false;
+        set({
+          islandDecorations: state.islandDecorations.filter(
+            item => item !== decorationId,
+          ),
+          lastSavedAt: new Date().toISOString(),
+        });
+        return true;
+      },
+      refreshWeather: () => {
+        const now = new Date();
+        const today = now.toISOString().slice(0, 10);
+        const state = get();
+        if (state.weatherUpdatedAt.startsWith(today)) return;
+        set({ weather: weatherForDate(now), weatherUpdatedAt: now.toISOString() });
+      },
       generateTile: () => {
         const state = get();
         const currentBoard = [
@@ -430,10 +543,20 @@ export const useGameStore = create<GameStore>()(
         const state = get();
         const result = mergeBoardTiles(state.board, firstTileId, secondTileId);
         if (!result.ok) return false;
+        const mergeCount = state.mergeCount + 1;
+        const chapterId = state.storyProgress.chapterId;
+        const hasClaimedMap = state.treasureMapClaimedChapterIds.includes(
+          chapterId,
+        );
+        const treasureMapPieces =
+          !hasClaimedMap && state.treasureMapPieces < 3 && mergeCount % 6 === 0
+            ? state.treasureMapPieces + 1
+            : state.treasureMapPieces;
         set({
           board: result.board,
-          coins: state.coins + result.reward,
-          mergeCount: state.mergeCount + 1,
+          coins: state.coins + result.reward + (state.weather === 'rainy' ? 2 : 0),
+          mergeCount,
+          treasureMapPieces,
           lastSavedAt: new Date().toISOString(),
         });
         return true;

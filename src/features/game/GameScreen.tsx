@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Alert,
   Image,
   ImageBackground,
   Modal,
@@ -16,7 +17,13 @@ import { CopilotStep, useCopilot, walkthroughable } from 'react-native-copilot';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { storyChapters } from '../../content/stories';
-import type { MergeTile, ResourceKind, StoryTask } from '../../domain/game';
+import {
+  islandDecorationCatalog,
+  type MergeTile,
+  type ResourceKind,
+  type StoryTask,
+  type WeatherType,
+} from '../../domain/game';
 import {
   getChapterCompletionReward,
   getEndlessProject,
@@ -83,6 +90,18 @@ const resourceNames: Record<ResourceKind, string> = {
   seaGlass: 'Cam',
   shell: 'Kabuk',
 };
+const weatherDetails: Record<WeatherType, { icon: string; title: string; body: string }> = {
+  sunny: { icon: '☀️', title: 'Güneşli', body: 'Kıyı ışıl ışıl, keşfe hazır.' },
+  rainy: { icon: '🌧️', title: 'Yağmurlu', body: 'Birleşimler +2 altın kazandırıyor.' },
+  windy: { icon: '🌬️', title: 'Rüzgârlı', body: 'Denizden yeni parçalar geliyor.' },
+  foggy: { icon: '🌫️', title: 'Sisli', body: 'Kıyıda gizemli bir atmosfer var.' },
+};
+const islandDecorationPositions = [
+  { left: '24%', top: '42%' },
+  { left: '57%', top: '38%' },
+  { left: '73%', top: '54%' },
+  { left: '39%', top: '58%' },
+];
 const CopilotNativeView = React.forwardRef<
   React.ComponentRef<typeof View>,
   React.ComponentProps<typeof View>
@@ -114,6 +133,8 @@ export function GameScreen({
   const isFocused = useIsFocused();
   const [accountVisible, setAccountVisible] = useState(overlay === 'account');
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [decorationVisible, setDecorationVisible] = useState(false);
+  const [lowCoinsVisible, setLowCoinsVisible] = useState(false);
   const [dailyChallengeVisible, setDailyChallengeVisible] = useState(false);
   const [canEnterChallenge, setCanEnterChallenge] = useState(false);
   const [challengeLoginNotice, setChallengeLoginNotice] = useState(false);
@@ -139,6 +160,9 @@ export function GameScreen({
   const tutorialStarted = useRef(false);
   const { start } = useCopilot();
   const store = useGameStore();
+  useEffect(() => {
+    useGameStore.getState().refreshWeather();
+  }, []);
   const {
     energy,
     maxEnergy,
@@ -208,6 +232,15 @@ export function GameScreen({
     }, 1_000);
     return () => clearInterval(timer);
   }, [store]);
+  useEffect(() => {
+    if (!isFocused || !chapterComplete || !nextChapter) return;
+    const frame = requestAnimationFrame(() => {
+      store.selectChapter(nextChapter.id);
+      setSelectedTileId(null);
+      setBoardMessage(`${nextChapter.location} için yeni proje planı açıldı.`);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [chapterComplete, isFocused, nextChapter, store]);
   useEffect(() => {
     if (useGameStore.persist.hasHydrated()) {
       setPlayerHydrated(true);
@@ -469,16 +502,6 @@ export function GameScreen({
     if (store.completeTask(activeTask)) setRewardTask(activeTask);
   }
 
-  function advanceFromCompletedChapter() {
-    if (nextChapter) {
-      store.selectChapter(nextChapter.id);
-      setSelectedTileId(null);
-      setBoardMessage(`${nextChapter.location} için yeni proje planı açıldı.`);
-      return;
-    }
-    setStoryMapVisible(true);
-  }
-
   function closeAccountSheet() {
     setAccountVisible(false);
     getCurrentGameAccount()
@@ -536,6 +559,59 @@ export function GameScreen({
             <Text style={styles.settingsShortcutIcon}>⚙</Text>
             <Text style={styles.settingsShortcutLabel}>Ayarlar</Text>
           </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ada dekorasyonlarını aç"
+            onPress={() => setDecorationVisible(true)}
+            style={styles.decorateShortcut}
+          >
+            <Text style={styles.decorateShortcutIcon}>🌺</Text>
+            <Text style={styles.decorateShortcutLabel}>Ada</Text>
+          </Pressable>
+          {store.islandDecorations.map((decorationId, index) => {
+            const decoration = islandDecorationCatalog.find(
+              item => item.id === decorationId,
+            );
+            if (!decoration) return null;
+            return (
+              <Text
+                key={decorationId}
+                accessibilityLabel={`${decoration.title} adaya yerleştirildi`}
+                style={[
+                  styles.islandDecoration,
+                  islandDecorationPositions[index % islandDecorationPositions.length],
+                ]}
+              >
+                {decoration.icon}
+              </Text>
+            );
+          })}
+          <CompanionCard
+            bond={store.companionBond}
+            ready={store.companionLastPlayedAt !== new Date().toISOString().slice(0, 10)}
+            onPlay={() => {
+              if (store.playWithCompanion()) {
+                setBoardMessage('Yunus çok mutlu! +10 altın kazandın.');
+              } else {
+                setBoardMessage('Yunusunla bugün zaten oynadın. Yarın yine bekliyor!');
+              }
+            }}
+          />
+          <WeatherCard weather={store.weather} />
+          <TreasureMapCard
+            pieces={store.treasureMapPieces}
+            claimed={store.treasureMapClaimedChapterIds.includes(
+              storyProgress.chapterId,
+            )}
+            onClaim={() => {
+              if (store.claimTreasureMap()) {
+                Alert.alert(
+                  'Hazine bulundu!',
+                  'Gizli sandıktan +120 altın ve +1 mücevher kazandın.',
+                );
+              }
+            }}
+          />
           <View style={[styles.islandQuest, { bottom: 87 + insets.bottom }]}>
             <Image
               source={miraQuestImage}
@@ -602,27 +678,7 @@ export function GameScreen({
                     ) : null}
                   </View>
                 </>
-              ) : nextChapter ? (
-                <View style={styles.chapterCompleteActions}>
-                  <Text style={styles.chapterCompleteText}>
-                    Yeni kıyı seni bekliyor.
-                  </Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Yeni bölüme başla"
-                    hitSlop={12}
-                    pressRetentionOffset={12}
-                    onPress={handleTaskAction}
-                    style={styles.chapterStartButton}
-                  >
-                    <View
-                      pointerEvents="none"
-                      style={styles.questButtonGloss}
-                    />
-                    <Text style={styles.questButtonText}>Başla</Text>
-                  </Pressable>
-                </View>
-              ) : (
+              ) : nextChapter ? null : (
                 <Text style={styles.chapterCompleteText}>
                   Yeni maceralar yakında burada olacak.
                 </Text>
@@ -694,28 +750,20 @@ export function GameScreen({
                 <BoardRequirements task={activeTask} inventory={inventory} />
               </CopilotView>
             </CopilotStep>
-          ) : (
+          ) : nextChapter ? null : (
             <View style={styles.chapterCompleteCard}>
               <View>
-                <Text style={styles.boardTaskLabel}>
-                  {nextChapter ? 'KIYI YENİLENDİ' : 'TÜM KIYILAR YENİLENDİ'}
-                </Text>
+                <Text style={styles.boardTaskLabel}>TÜM KIYILAR YENİLENDİ</Text>
                 <Text style={styles.chapterCompleteTitle}>
-                  {nextChapter
-                    ? `${nextChapter.location} seni bekliyor`
-                    : 'Harika iş çıkardın, deniz yeniden ışıldıyor.'}
+                  Harika iş çıkardın, deniz yeniden ışıldıyor.
                 </Text>
               </View>
               <Pressable
-                accessibilityLabel={
-                  nextChapter ? 'Yeni bölüme başla' : 'Hikâye haritasını aç'
-                }
-                onPress={advanceFromCompletedChapter}
+                accessibilityLabel="Hikâye haritasını aç"
+                onPress={() => setStoryMapVisible(true)}
                 style={styles.boardCompleteButton}
               >
-                <Text style={styles.boardCompleteButtonText}>
-                  {nextChapter ? 'Başla' : 'Harita'}
-                </Text>
+                <Text style={styles.boardCompleteButtonText}>Harita</Text>
               </Pressable>
             </View>
           )}
@@ -1002,6 +1050,50 @@ export function GameScreen({
         onChoose={store.selectChapter}
         onClose={closeStoryMapSheet}
       />
+      <DecorationSheet
+        visible={decorationVisible}
+        coins={coins}
+        ownedDecorationIds={store.islandDecorations}
+        onToggle={decorationId => {
+          if (store.islandDecorations.includes(decorationId)) {
+            return store.removeIslandDecoration(decorationId);
+          }
+          if (store.buyIslandDecoration(decorationId)) return true;
+          setDecorationVisible(false);
+          setTimeout(() => setLowCoinsVisible(true), 120);
+          return false;
+        }}
+        onClose={() => setDecorationVisible(false)}
+      />
+      <Modal
+        transparent
+        visible={lowCoinsVisible}
+        animationType="fade"
+        onRequestClose={() => setLowCoinsVisible(false)}
+      >
+        <View style={styles.offerBackdrop}>
+          <Pressable
+            accessibilityLabel="Altın bildirimi penceresini kapat"
+            onPress={() => setLowCoinsVisible(false)}
+            style={styles.offerDismissArea}
+          />
+          <View style={styles.lowCoinsCard}>
+            <Image source={hudCoinImage} style={styles.lowCoinsIcon} />
+            <Text style={styles.lowCoinsTitle}>Yeterli altın yok</Text>
+            <Text style={styles.lowCoinsBody}>
+              Bu dekorasyonu almak için biraz daha altın biriktirmelisin.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Altın bildirimini kapat"
+              onPress={() => setLowCoinsVisible(false)}
+              style={styles.lowCoinsButton}
+            >
+              <Text style={styles.lowCoinsButtonText}>Tamam</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
       <TaskRewardModal
         task={rewardTask}
         location={activeChapter.location}
@@ -1187,6 +1279,167 @@ function TopBar({
         </View>
       </Modal>
     </>
+  );
+}
+
+function CompanionCard({
+  bond,
+  ready,
+  onPlay,
+}: {
+  bond: number;
+  ready: boolean;
+  onPlay: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Yunus dostunla oyna"
+      onPress={onPlay}
+      style={styles.companionCard}
+    >
+      <Text style={styles.companionEmoji}>🐬</Text>
+      <View style={styles.companionCopy}>
+        <Text style={styles.companionEyebrow}>KIYI DOSTUN</Text>
+        <Text style={styles.companionTitle}>Mavi</Text>
+        <Text style={styles.companionStatus}>
+          {ready ? 'Oyna · +10 altın' : `Bağ ${bond} · yarın gel`}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function WeatherCard({ weather }: { weather: WeatherType }) {
+  const details = weatherDetails[weather];
+  return (
+    <View style={styles.weatherCard}>
+      <Text style={styles.weatherIcon}>{details.icon}</Text>
+      <View style={styles.weatherCopy}>
+        <Text style={styles.weatherEyebrow}>BUGÜN KIYIDA</Text>
+        <Text style={styles.weatherTitle}>{details.title}</Text>
+        <Text style={styles.weatherBody}>{details.body}</Text>
+      </View>
+    </View>
+  );
+}
+
+function TreasureMapCard({
+  pieces,
+  claimed,
+  onClaim,
+}: {
+  pieces: number;
+  claimed: boolean;
+  onClaim: () => void;
+}) {
+  return (
+    <View style={styles.treasureMapCard}>
+      <Text style={styles.treasureMapIcon}>🗺️</Text>
+      <View style={styles.treasureMapCopy}>
+        <Text style={styles.treasureMapEyebrow}>GİZLİ HAZİNE</Text>
+        <Text style={styles.treasureMapTitle}>
+          {claimed ? 'Hazine bulundu' : 'Harita parçaları'}
+        </Text>
+        <Text style={styles.treasureMapBody}>
+          {claimed ? 'Bu kıyıda sandık boş.' : `${pieces}/3 parça bulundu`}
+        </Text>
+      </View>
+      {!claimed && pieces >= 3 ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Gizli hazineyi aç"
+          onPress={onClaim}
+          style={styles.treasureMapButton}
+        >
+          <Text style={styles.treasureMapButtonText}>Aç</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function DecorationSheet({
+  visible,
+  coins,
+  ownedDecorationIds,
+  onToggle,
+  onClose,
+}: {
+  visible: boolean;
+  coins: number;
+  ownedDecorationIds: string[];
+  onToggle: (decorationId: string) => boolean;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.decorationBackdrop}>
+        <Pressable
+          accessibilityLabel="Dekorasyon penceresini kapat"
+          onPress={onClose}
+          style={styles.offerDismissArea}
+        />
+        <View style={styles.decorationSheet}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Dekorasyon penceresini kapat"
+            onPress={onClose}
+            style={styles.decorationClose}
+          >
+            <Text style={styles.decorationCloseText}>×</Text>
+          </Pressable>
+          <Text style={styles.decorationEyebrow}>KENDİ KIYIN</Text>
+          <Text style={styles.decorationTitle}>Adayı dekore et</Text>
+          <Text style={styles.decorationBody}>
+            Kazandığın altınlarla kıyına yeni bir görünüm kazandır.
+          </Text>
+          <View style={styles.decorationCoinPill}>
+            <Image source={hudCoinImage} style={styles.smallCoinImage} />
+            <Text style={styles.decorationCoinText}>{coins}</Text>
+          </View>
+          <View style={styles.decorationGrid}>
+            {islandDecorationCatalog.map(decoration => {
+              const owned = ownedDecorationIds.includes(decoration.id);
+              const canBuy = coins >= decoration.cost;
+              return (
+                <Pressable
+                  key={decoration.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${decoration.title}, ${
+                    owned ? 'kaldırmak için dokun' : `${decoration.cost} altın`
+                  }`}
+                  onPress={() => {
+                    if (onToggle(decoration.id) && !owned) onClose();
+                  }}
+                  style={[
+                    styles.decorationItem,
+                    owned && styles.decorationItemOwned,
+                    !owned && !canBuy && styles.decorationItemDisabled,
+                  ]}
+                >
+                  <Text style={styles.decorationItemIcon}>{decoration.icon}</Text>
+                  <Text style={styles.decorationItemTitle}>{decoration.title}</Text>
+                  <View style={styles.decorationCostRow}>
+                    {!owned ? (
+                      <Image source={hudCoinImage} style={styles.tinyCoinImage} />
+                    ) : null}
+                    <Text style={styles.decorationItemCost}>
+                      {owned ? 'Kaldır' : decoration.cost}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 function Pill({
@@ -1752,6 +2005,127 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: 1,
   },
+  decorateShortcut: {
+    position: 'absolute',
+    right: 13,
+    top: 292,
+    width: 66,
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+    backgroundColor: '#07527A',
+    borderWidth: 2,
+    borderColor: '#E8B64D',
+    shadowColor: '#12364B',
+    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 3,
+    elevation: 6,
+  },
+  decorateShortcutIcon: { fontSize: 22, lineHeight: 25 },
+  decorateShortcutLabel: {
+    color: '#FFF3D3',
+    fontSize: 9,
+    fontWeight: '900',
+    marginTop: 1,
+  },
+  islandDecoration: {
+    position: 'absolute',
+    zIndex: 1,
+    fontSize: 40,
+    textShadowColor: 'rgba(3, 36, 52, 0.45)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 4,
+  },
+  companionCard: {
+    position: 'absolute',
+    left: 13,
+    top: 148,
+    width: 154,
+    minHeight: 69,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    backgroundColor: '#FFF3D8',
+    borderWidth: 2,
+    borderColor: '#7CC1D0',
+    shadowColor: '#12364B',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  companionEmoji: { fontSize: 32, marginRight: 8 },
+  companionCopy: { flex: 1 },
+  companionEyebrow: { color: '#39708C', fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
+  companionTitle: { color: '#68462B', fontSize: 15, fontWeight: '900', marginTop: 1 },
+  companionStatus: { color: '#6C8B8F', fontSize: 9, fontWeight: '800', marginTop: 2 },
+  weatherCard: {
+    position: 'absolute',
+    left: 13,
+    top: 228,
+    width: 154,
+    minHeight: 59,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    borderRadius: 18,
+    backgroundColor: 'rgba(6, 61, 92, 0.9)',
+    borderWidth: 1,
+    borderColor: '#6BB5C6',
+  },
+  weatherIcon: { fontSize: 25, marginRight: 8 },
+  weatherCopy: { flex: 1 },
+  weatherEyebrow: { color: '#A9E0E5', fontSize: 7, fontWeight: '900', letterSpacing: 0.7 },
+  weatherTitle: { color: '#FFF3D3', fontSize: 14, fontWeight: '900', marginTop: 1 },
+  weatherBody: { color: '#D5EEF0', fontSize: 8, lineHeight: 11, marginTop: 1 },
+  treasureMapCard: {
+    position: 'absolute',
+    left: 13,
+    top: 296,
+    width: 154,
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    borderRadius: 18,
+    backgroundColor: '#FFF0BC',
+    borderWidth: 2,
+    borderColor: '#D99A42',
+    shadowColor: '#12364B',
+    shadowOpacity: 0.28,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  treasureMapIcon: { fontSize: 25, marginRight: 7 },
+  treasureMapCopy: { flex: 1 },
+  treasureMapEyebrow: {
+    color: '#9B6423',
+    fontSize: 7,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+  },
+  treasureMapTitle: {
+    color: '#604021',
+    fontSize: 12,
+    fontWeight: '900',
+    marginTop: 1,
+  },
+  treasureMapBody: { color: '#8A673B', fontSize: 8, marginTop: 2 },
+  treasureMapButton: {
+    minWidth: 31,
+    minHeight: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: '#E68B20',
+    borderWidth: 1,
+    borderColor: '#FFD47A',
+  },
+  treasureMapButtonText: { color: '#FFF9E8', fontSize: 11, fontWeight: '900' },
   challengeLoginCard: {
     width: '100%',
     maxWidth: 350,
@@ -1767,6 +2141,47 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 12,
   },
+  lowCoinsCard: {
+    width: '100%',
+    maxWidth: 330,
+    alignItems: 'center',
+    padding: 24,
+    borderRadius: 27,
+    backgroundColor: '#FFF7E8',
+    borderWidth: 2,
+    borderColor: '#E7B866',
+    shadowColor: '#071C28',
+    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  lowCoinsIcon: { width: 52, height: 52, resizeMode: 'contain' },
+  lowCoinsTitle: {
+    color: '#503421',
+    fontSize: 21,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  lowCoinsBody: {
+    color: '#886B4C',
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  lowCoinsButton: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    paddingVertical: 13,
+    borderRadius: 15,
+    backgroundColor: '#E68B20',
+    borderWidth: 2,
+    borderColor: '#FFD47A',
+    marginTop: 18,
+  },
+  lowCoinsButtonText: { color: '#FFF', fontSize: 16, fontWeight: '900' },
   challengeLoginClose: {
     position: 'absolute',
     right: 12,
@@ -1887,23 +2302,6 @@ const styles = StyleSheet.create({
     color: '#81644A',
     fontWeight: '700',
     textAlign: 'center',
-  },
-  chapterCompleteActions: { marginTop: 12, marginLeft: 55, marginRight: 10 },
-  chapterStartButton: {
-    height: 48,
-    marginTop: 9,
-    overflow: 'hidden',
-    backgroundColor: '#4EBC35',
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#D5F699',
-    shadowColor: '#2E6F25',
-    shadowOpacity: 0.42,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 3,
-    elevation: 5,
   },
   questActions: {
     position: 'absolute',
@@ -2396,6 +2794,69 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: 'rgba(4, 24, 36, 0.72)',
   },
+  decorationBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(4, 24, 36, 0.62)',
+  },
+  decorationSheet: {
+    zIndex: 2,
+    elevation: 12,
+    padding: 22,
+    paddingBottom: 30,
+    backgroundColor: '#FFF7E8',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    borderTopWidth: 2,
+    borderColor: '#E7B866',
+  },
+  decorationClose: {
+    position: 'absolute',
+    zIndex: 3,
+    right: 14,
+    top: 12,
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 17,
+    backgroundColor: '#F3E2C6',
+  },
+  decorationCloseText: { color: '#795331', fontSize: 25, lineHeight: 27, fontWeight: '700' },
+  decorationEyebrow: { color: '#A96E2E', fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
+  decorationTitle: { color: '#503421', fontSize: 25, fontWeight: '900', marginTop: 2 },
+  decorationBody: { color: '#886B4C', fontSize: 12, lineHeight: 17, marginTop: 5, paddingRight: 42 },
+  decorationCoinPill: {
+    position: 'absolute',
+    right: 58,
+    top: 12,
+    minWidth: 68,
+    height: 34,
+    paddingHorizontal: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 17,
+    backgroundColor: '#FFF0B8',
+    borderWidth: 1,
+    borderColor: '#E7B866',
+    shadowColor: '#8A5B25',
+    shadowOpacity: 0.16,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  smallCoinImage: { width: 22, height: 22, resizeMode: 'contain', marginRight: 4 },
+  decorationCoinText: { color: '#6F481D', fontSize: 13, fontWeight: '900' },
+  decorationGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 18 },
+  decorationItem: { width: '31%', minHeight: 112, alignItems: 'center', justifyContent: 'center', padding: 8, borderRadius: 17, backgroundColor: '#FFFDF7', borderWidth: 1, borderColor: '#E5CEAD' },
+  decorationItemOwned: { backgroundColor: '#E8F5DA', borderColor: '#9CCB7D' },
+  decorationItemDisabled: { opacity: 0.48 },
+  decorationItemIcon: { fontSize: 34 },
+  decorationItemTitle: { color: '#5E3C22', fontSize: 10, fontWeight: '900', textAlign: 'center', marginTop: 4 },
+  decorationCostRow: { flexDirection: 'row', alignItems: 'center', marginTop: 5 },
+  tinyCoinImage: { width: 15, height: 15, resizeMode: 'contain', marginRight: 2 },
+  decorationItemCost: { color: '#9B6423', fontSize: 9, fontWeight: '900' },
   offerDismissArea: { ...StyleSheet.absoluteFill },
   offerCard: {
     width: '100%',
