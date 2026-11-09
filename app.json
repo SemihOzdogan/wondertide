@@ -2,6 +2,7 @@
   "name": "Wondertide",
   "displayName": "Wondertide",
   "react-native-google-mobile-ads": {
-    "ios_app_id": "ca-app-pub-4537184745410870~4448348525"
+    "ios_app_id": "ca-app-pub-4537184745410870~4448348525",
+    "android_app_id": "ca-app-pub-3940256099942544~3347511713"
   }
 }

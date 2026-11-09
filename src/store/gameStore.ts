@@ -58,6 +58,8 @@ const initialPlayerState: PlayerState = {
   tutorialPhase: 'welcome',
   tutorialVersion: 5,
   lastSavedAt: new Date().toISOString(),
+  musicEnabled: true,
+  effectsEnabled: true,
 };
 
 type GameStore = PlayerState & {
@@ -91,6 +93,10 @@ type GameStore = PlayerState & {
   hydrate: (player: Partial<PlayerState>) => void;
   beginGameTutorial: () => void;
   dismissIntro: () => void;
+  setAudioSettings: (settings: {
+    musicEnabled?: boolean;
+    effectsEnabled?: boolean;
+  }) => void;
 };
 
 const resourceOrder: ResourceKind[] = ['driftwood', 'seaGlass', 'shell'];
@@ -291,6 +297,11 @@ export const useGameStore = create<GameStore>()(
   persist(
     (set, get) => ({
       ...initialPlayerState,
+      setAudioSettings: settings =>
+        set(state => ({
+          ...settings,
+          lastSavedAt: new Date().toISOString(),
+        })),
       generateTile: () => {
         const state = get();
         const currentBoard = [

@@ -23,10 +23,12 @@ import {
   useGameStore,
 } from '../../store/gameStore';
 import { AccountSheet } from './AccountSheet';
+import { GameSettingsSheet } from './GameSettingsSheet';
 import { StoryMapSheet } from './StoryMapSheet';
 import { TaskRewardModal } from './TaskRewardModal';
 import { DailyChallengeSheet } from './DailyChallengeSheet';
 import { showRewardedEnergyAd } from '../../services/ads/rewardedAd';
+import { playGameEffect } from '../../services/gameMusic';
 import { getCurrentGameAccount } from '../../services/supabase/authService';
 import type { RootStackParamList } from '../../navigation/types';
 
@@ -111,6 +113,7 @@ export function GameScreen({
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const isFocused = useIsFocused();
   const [accountVisible, setAccountVisible] = useState(overlay === 'account');
+  const [settingsVisible, setSettingsVisible] = useState(false);
   const [dailyChallengeVisible, setDailyChallengeVisible] = useState(false);
   const [canEnterChallenge, setCanEnterChallenge] = useState(false);
   const [challengeLoginNotice, setChallengeLoginNotice] = useState(false);
@@ -266,6 +269,7 @@ export function GameScreen({
       candidate => candidate?.id === secondTileId,
     );
     if (!store.mergeTiles(firstTileId, secondTileId)) return false;
+    playGameEffect();
     const clearedMoss = mossyCellIndices.includes(targetIndex);
     if (clearedMoss) store.clearMossAt(targetIndex);
     const selectedLevel =
@@ -384,6 +388,7 @@ export function GameScreen({
 
   function deliverSelectedTile() {
     if (!selectedTileId || !store.deliverProjectTile(selectedTileId)) return;
+    playGameEffect();
     setSelectedTileId(null);
     if (activeTask && store.canComplete(activeTask)) {
       const completed = isEndlessMode
@@ -521,6 +526,15 @@ export function GameScreen({
           >
             <Text style={styles.challengeShortcutIcon}>🏆</Text>
             <Text style={styles.challengeShortcutLabel}>Mücadele</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Oyun ayarlarını aç"
+            onPress={() => setSettingsVisible(true)}
+            style={styles.settingsShortcut}
+          >
+            <Text style={styles.settingsShortcutIcon}>⚙</Text>
+            <Text style={styles.settingsShortcutLabel}>Ayarlar</Text>
           </Pressable>
           <View style={[styles.islandQuest, { bottom: 87 + insets.bottom }]}>
             <Image
@@ -921,8 +935,12 @@ export function GameScreen({
           setAccountVisible(false);
           setDailyChallengeVisible(true);
         }}
+      />
+      <GameSettingsSheet
+        visible={settingsVisible}
+        onClose={() => setSettingsVisible(false)}
         onStartTutorial={() => {
-          setAccountVisible(false);
+          setSettingsVisible(false);
           store.beginGameTutorial();
           if (onOpenBoard) onOpenBoard();
           else navigation.navigate('Board');
@@ -1539,8 +1557,8 @@ const styles = StyleSheet.create({
   },
   currencies: {
     position: 'absolute',
-    left: 122,
-    right: 9,
+    left: 142,
+    right: 10,
     top: 12,
     height: 47,
     flexDirection: 'row',
@@ -1708,6 +1726,31 @@ const styles = StyleSheet.create({
     marginTop: -1,
     textShadowColor: '#06364F',
     textShadowRadius: 2,
+  },
+  settingsShortcut: {
+    position: 'absolute',
+    right: 13,
+    top: 225,
+    width: 66,
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+    backgroundColor: '#07527A',
+    borderWidth: 2,
+    borderColor: '#8FC7D4',
+    shadowColor: '#12364B',
+    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 3,
+    elevation: 6,
+  },
+  settingsShortcutIcon: { color: '#FFF3D3', fontSize: 23, lineHeight: 26 },
+  settingsShortcutLabel: {
+    color: '#FFF3D3',
+    fontSize: 9,
+    fontWeight: '900',
+    marginTop: 1,
   },
   challengeLoginCard: {
     width: '100%',

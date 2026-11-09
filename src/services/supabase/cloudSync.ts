@@ -29,6 +29,8 @@ function stateFromStore(state: PlayerState): PlayerState {
     tutorialPhase: state.tutorialPhase,
     tutorialVersion: state.tutorialVersion,
     lastSavedAt: state.lastSavedAt,
+    musicEnabled: state.musicEnabled,
+    effectsEnabled: state.effectsEnabled,
   };
 }
 

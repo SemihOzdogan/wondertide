@@ -11,6 +11,12 @@ import { listenForAuthRedirects } from './src/services/supabase/authService';
 import { startCloudSync } from './src/services/supabase/cloudSync';
 import { supabase } from './src/services/supabase/supabase';
 import { initializeRewardedAds } from './src/services/ads/rewardedAd';
+import {
+  configureGameAudio,
+  startGameMusic,
+  stopGameMusic,
+} from './src/services/gameMusic';
+import { useGameStore } from './src/store/gameStore';
 
 function App() {
   return (
@@ -45,6 +51,20 @@ function GameBootstrap() {
     }
 
     initializeRewardedAds();
+    const unsubscribeAudio = useGameStore.subscribe(state => {
+      configureGameAudio(
+        state.musicEnabled,
+        state.effectsEnabled,
+      );
+      if (state.musicEnabled) startGameMusic();
+      else stopGameMusic();
+    });
+    const audioSettings = useGameStore.getState();
+    configureGameAudio(
+      audioSettings.musicEnabled,
+      audioSettings.effectsEnabled,
+    );
+    startGameMusic();
     ensureGameAccount()
       .then(account => syncAccount(account.id))
       .catch(error => {
@@ -63,6 +83,8 @@ function GameBootstrap() {
     const stopListening = listenForAuthRedirects();
     return () => {
       unsubscribe?.();
+      unsubscribeAudio();
+      stopGameMusic();
       stopListening();
       authListener.subscription.unsubscribe();
     };

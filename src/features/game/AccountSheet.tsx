@@ -17,7 +17,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleCheck,
-  CircleHelp,
   Gift,
   LockKeyhole,
   Mail,
@@ -52,14 +51,12 @@ import { useSheetDismissGesture } from './useSheetDismissGesture';
 type Props = {
   visible: boolean;
   onClose: () => void;
-  onStartTutorial: () => void;
   onAccountAuthenticated: () => void;
 };
 
 export function AccountSheet({
   visible,
   onClose,
-  onStartTutorial,
   onAccountAuthenticated,
 }: Props) {
   const { panGesture, sheetStyle } = useSheetDismissGesture(visible, onClose);
@@ -358,23 +355,6 @@ export function AccountSheet({
                     )}
                   </>
                 )}
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Nasıl oynanır rehberini başlat"
-                  onPress={onStartTutorial}
-                  style={styles.tutorialAction}
-                >
-                  <View style={styles.tutorialIcon}>
-                    <CircleHelp color="#2A6B8B" size={22} strokeWidth={2.5} />
-                  </View>
-                  <View style={styles.tutorialCopy}>
-                    <Text style={styles.tutorialTitle}>Nasıl oynanır?</Text>
-                    <Text style={styles.tutorialBody}>
-                      Mira, hedefleri ve birleşimleri adım adım göstersin.
-                    </Text>
-                  </View>
-                  <ChevronRight color="#2A6B8B" size={21} strokeWidth={2.8} />
-                </Pressable>
                 {notice ? (
                   <View style={styles.notice}>
                     <Text style={styles.noticeText}>{notice}</Text>
@@ -800,33 +780,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: '700',
     fontSize: 12,
-  },
-  tutorialAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 16,
-    padding: 13,
-    borderRadius: 17,
-    backgroundColor: '#E5F2FA',
-    borderWidth: 1,
-    borderColor: '#9FCBE0',
-  },
-  tutorialIcon: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 20,
-    backgroundColor: '#FFF',
-  },
-  tutorialCopy: { flex: 1, marginHorizontal: 11 },
-  tutorialTitle: { color: '#2A6683', fontSize: 14, fontWeight: '900' },
-  tutorialBody: {
-    color: '#527D91',
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: 2,
-    fontWeight: '600',
   },
   input: {
     flex: 1,

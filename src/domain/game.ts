@@ -42,6 +42,8 @@ export type PlayerState = {
   tutorialPhase: 'welcome' | 'board' | 'complete';
   tutorialVersion: number;
   lastSavedAt: string;
+  musicEnabled: boolean;
+  effectsEnabled: boolean;
 };
 
 export type StoryTask = {

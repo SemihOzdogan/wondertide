@@ -10,6 +10,12 @@ require Pod::Executable.execute_command('node', ['-p',
 # prevent an older third-party pod from emitting an iOS 13
 # deployment target into Pods.xcodeproj.
 platform :ios, '15.1'
+
+# React Native 0.87.1's Debug React framework references Hermes CDP symbols.
+# The downloaded prebuilt Hermes binary can omit those symbols, so build Hermes
+# from the matching source revision to keep the Debug linker/runtime consistent.
+ENV['RCT_BUILD_HERMES_FROM_SOURCE'] = 'true'
+
 prepare_react_native_project!
 
 linkage = ENV['USE_FRAMEWORKS']
